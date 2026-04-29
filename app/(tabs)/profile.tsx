@@ -674,7 +674,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* App Settings Section */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>App Settings</Text>
 
           <MenuItem
@@ -705,10 +705,10 @@ export default function ProfileScreen() {
             onPress={() => Alert.alert("Language", "Feature coming soon")}
             showChevron
           />
-        </View>
+        </View> */}
 
         {/* About Section */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
 
           <MenuItem
@@ -733,7 +733,7 @@ export default function ProfileScreen() {
             onPress={() => Alert.alert("Privacy", "Feature coming soon")}
             showChevron
           />
-        </View>
+        </View> */}
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
