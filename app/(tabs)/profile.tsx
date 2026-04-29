@@ -626,6 +626,24 @@ export default function ProfileScreen() {
                 <Text style={styles.capitalInButtonText}>Add Capital In</Text>
               </TouchableOpacity>
             )}
+
+            {/* All Money Transactions Button - Admin Only */}
+            {profile.roleId.role === "Admin" && (
+              <TouchableOpacity
+                style={styles.transactionsButton}
+                onPress={() => router.push("/transactions")}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="receipt-outline"
+                  size={20}
+                  color={ZentyalColors.primary}
+                />
+                <Text style={styles.transactionsButtonText}>
+                  All Money Transactions
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1244,6 +1262,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#fff",
+  },
+  transactionsButton: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: ZentyalColors.primary,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  transactionsButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: ZentyalColors.primary,
   },
   section: {
     marginBottom: 24,

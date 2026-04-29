@@ -83,6 +83,14 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
   - Displays: CAPITAL_IN, EARNING, WITHDRAWAL transactions
   - Shows summary cards and detailed transaction list
   - Filterable by status and type
+- All Money Transactions screen (admin only)
+  - **Admin Only** - Button visible only for Admin users
+  - Endpoint: GET /api/admin/ledger
+  - Displays all system ledger entries (Capital In, Loan Release, Repayment, Expense, Withdrawal)
+  - Shows summary cards: Total In, Total Out, Net Cash Flow
+  - Transaction details: type, date, amount, direction, user, loan reference, description
+  - Status indicators (Completed/Cancelled)
+  - Pull-to-refresh functionality
   - Supports pull-to-refresh
 
 ❌ **Not Yet Implemented:**
@@ -846,7 +854,106 @@ POST   /api/profile/withdraw        - Withdraw funds from user balance
 GET    /api/profile/userledger      - Get user's ledger transactions (with optional filters)
 
 Admin - Ledger:
+GET    /api/admin/ledger            - Get all system ledger entries (with optional filters)
 POST   /api/admin/ledger            - Add capital in / Create ledger entry
+```
+
+### Get All Money Transactions API Details
+
+**GET /api/admin/ledger**
+
+Fetches all ledger entries from the system. Admin only.
+
+**Query Parameters (all optional):**
+
+- `status`: Filter by status - "Completed" | "Cancelled"
+- `type`: Filter by type - "Capital In" | "Loan Release" | "Repayment" | "Expense" | "Withdrawal"
+- `direction`: Filter by direction - "In" | "Out"
+- `userId`: Filter by user ID
+- `loanId`: Filter by loan ID
+- `cycleId`: Filter by cycle ID
+- `paymentId`: Filter by payment ID
+
+**Response:**
+
+```typescript
+LedgerEntry[] = [
+  {
+    _id: string;
+    date: string;              // ISO date string
+    amount: number;
+    type: "Capital In" | "Loan Release" | "Repayment" | "Expense" | "Withdrawal";
+    direction: "In" | "Out";
+    status: "Completed" | "Cancelled";
+    userId?: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    loanId?: {
+      _id: string;
+      loanNo: string;
+      clientId: {
+        _id: string;
+        firstName: string;
+        middleName?: string;
+        lastName: string;
+        email: string;
+      };
+      principal: number;
+      interestRate: number;
+      terms: number;
+      status: string;
+    };
+    cycleId?: {
+      _id: string;
+      cycleCount: number;
+      totalDue: number;
+      balance: number;
+      dateDue: string;
+      status: string;
+    };
+    paymentId?: {
+      _id: string;
+      paymentNo: string;
+      amount: number;
+      datePaid: string;
+      status: string;
+    };
+    description?: string;
+    createdAt: string;
+    updatedAt: string;
+    createdBy?: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+  }
+]
+```
+
+**Usage Example:**
+
+```typescript
+// Get all ledgers
+const ledgers = await apiRequest<LedgerEntry[]>("/api/admin/ledger");
+
+// Get only Capital In transactions
+const capitalIn = await apiRequest<LedgerEntry[]>(
+  "/api/admin/ledger?type=Capital In",
+);
+
+// Get only completed transactions
+const completed = await apiRequest<LedgerEntry[]>(
+  "/api/admin/ledger?status=Completed",
+);
+
+// Get only money coming in
+const incoming = await apiRequest<LedgerEntry[]>(
+  "/api/admin/ledger?direction=In",
+);
 ```
 
 ### Add Capital In API Details
