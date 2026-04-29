@@ -53,6 +53,14 @@ export default function ProfileScreen() {
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [changePasswordModalVisible, setChangePasswordModalVisible] =
+    useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   /**
    * Fetch full profile data from backend
@@ -170,7 +178,84 @@ export default function ProfileScreen() {
    * Handle change password
    */
   function handleChangePassword() {
-    Alert.alert("Change Password", "This feature will be implemented soon");
+    setOldPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowOldPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setChangePasswordModalVisible(true);
+  }
+
+  /**
+   * Process change password
+   */
+  async function processChangePassword() {
+    // Validate input
+    if (!oldPassword || oldPassword.trim() === "") {
+      Alert.alert("Error", "Current password is required");
+      return;
+    }
+
+    if (!newPassword || newPassword.trim() === "") {
+      Alert.alert("Error", "New password is required");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert("Error", "New password must be at least 6 characters long");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Error", "New password and confirmation do not match");
+      return;
+    }
+
+    if (oldPassword === newPassword) {
+      Alert.alert(
+        "Error",
+        "New password must be different from current password",
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setChangePasswordModalVisible(false);
+
+      await apiRequest<{
+        message: string;
+      }>("/api/profile/change-password", {
+        method: "POST",
+        body: JSON.stringify({
+          oldPassword,
+          newPassword,
+          confirmPassword,
+        }),
+      });
+
+      Alert.alert(
+        "Success",
+        "Password changed successfully. Please login again with your new password.",
+        [
+          {
+            text: "OK",
+            onPress: async () => {
+              await logout();
+              router.replace("/login");
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      Alert.alert(
+        "Change Password Failed",
+        error instanceof Error ? error.message : "Failed to change password",
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   /**
@@ -520,6 +605,132 @@ export default function ProfileScreen() {
                 onPress={processWithdrawal}
               >
                 <Text style={styles.modalConfirmButtonText}>Withdraw</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={changePasswordModalVisible}
+        onRequestClose={() => setChangePasswordModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Change Password</Text>
+              <TouchableOpacity
+                onPress={() => setChangePasswordModalVisible(false)}
+              >
+                <Ionicons name="close" size={24} color={ZentyalColors.dark} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Enter your current password and choose a new password
+            </Text>
+
+            {/* Current Password */}
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Current Password</Text>
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalPasswordInput}
+                  value={oldPassword}
+                  onChangeText={setOldPassword}
+                  placeholder="Enter current password"
+                  secureTextEntry={!showOldPassword}
+                  placeholderTextColor={ZentyalColors.gray}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowOldPassword(!showOldPassword)}
+                  style={styles.passwordToggle}
+                >
+                  <Ionicons
+                    name={showOldPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color={ZentyalColors.gray}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* New Password */}
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>New Password</Text>
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalPasswordInput}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="Enter new password"
+                  secureTextEntry={!showNewPassword}
+                  placeholderTextColor={ZentyalColors.gray}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                  style={styles.passwordToggle}
+                >
+                  <Ionicons
+                    name={showNewPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color={ZentyalColors.gray}
+                  />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.passwordHint}>
+                Must be at least 6 characters
+              </Text>
+            </View>
+
+            {/* Confirm Password */}
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Confirm New Password</Text>
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalPasswordInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm new password"
+                  secureTextEntry={!showConfirmPassword}
+                  placeholderTextColor={ZentyalColors.gray}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.passwordToggle}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color={ZentyalColors.gray}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setChangePasswordModalVisible(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={processChangePassword}
+              >
+                <Text style={styles.modalConfirmButtonText}>
+                  Change Password
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -937,5 +1148,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#fff",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: ZentyalColors.gray,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  modalPasswordInput: {
+    flex: 1,
+    fontSize: 16,
+    color: ZentyalColors.dark,
+    paddingVertical: 14,
+  },
+  passwordToggle: {
+    padding: 8,
+  },
+  passwordHint: {
+    fontSize: 12,
+    color: ZentyalColors.gray,
+    marginTop: 6,
   },
 });

@@ -63,6 +63,11 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
 - Dashboard screen with statistics
 - Profile/Menu screen with settings
 - Withdrawal process (profile page)
+- Change Password feature (profile page)
+  - Endpoint: POST /api/profile/change-password
+  - Requires: oldPassword, newPassword, confirmPassword
+  - Validates: password length (min 6), matching confirmation, different from old
+  - Auto-logout after successful password change
 - User Ledger screen (transaction history)
   - Endpoint: GET /api/profile/userledger
   - Displays: CAPITAL_IN, EARNING, WITHDRAWAL transactions
@@ -829,6 +834,62 @@ GET    /api/profile                 - Get current user profile
 POST   /api/profile/change-password - Change password
 POST   /api/profile/withdraw        - Withdraw funds from user balance
 GET    /api/profile/userledger      - Get user's ledger transactions (with optional filters)
+```
+
+### Change Password API Details
+
+**POST /api/profile/change-password**
+
+Changes the password for the current authenticated user.
+
+**Request Body:**
+
+```typescript
+{
+  oldPassword: string; // Current password
+  newPassword: string; // New password (min 6 characters)
+  confirmPassword: string; // Must match newPassword
+}
+```
+
+**Validations:**
+
+- All fields are required
+- `oldPassword` must be correct
+- `newPassword` must be at least 6 characters long
+- `newPassword` must match `confirmPassword`
+- `newPassword` must be different from `oldPassword`
+
+**Response:**
+
+```typescript
+{
+  message: "Password changed successfully";
+}
+```
+
+**Error Responses:**
+
+- 401: "Current password is incorrect"
+- 400: "New password must be at least 6 characters long"
+- 400: "New password and confirmation do not match"
+- 400: "New password must be different from current password"
+
+**Usage Example:**
+
+```typescript
+await apiRequest("/api/profile/change-password", {
+  method: "POST",
+  body: JSON.stringify({
+    oldPassword: "oldpass123",
+    newPassword: "newpass123",
+    confirmPassword: "newpass123",
+  }),
+});
+
+// After successful change, user should logout and login again
+await logout();
+router.replace("/login");
 ```
 
 ### User Ledger API Details
