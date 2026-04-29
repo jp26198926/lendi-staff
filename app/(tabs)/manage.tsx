@@ -6,6 +6,7 @@
 import { ZentyalColors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import {
   Alert,
   ScrollView,
@@ -16,7 +17,7 @@ import {
 } from "react-native";
 
 export default function ManageScreen() {
-  const { user } = useAuth();
+  const { hasPermission } = useAuth();
 
   return (
     <ScrollView
@@ -37,7 +38,13 @@ export default function ManageScreen() {
           icon="people"
           label="Clients"
           description="Manage client information"
-          onPress={() => Alert.alert("Clients", "Coming soon")}
+          onPress={() => {
+            if (hasPermission("/admin/client", "Access")) {
+              router.push("/clients" as any);
+            } else {
+              Alert.alert("Access Denied", "You don't have permission to access this page");
+            }
+          }}
           color={ZentyalColors.primary}
         />
 

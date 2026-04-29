@@ -96,12 +96,23 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
   - Menu interface for managing system entities
   - 4 main sections: Clients, Loans, Cycles, Payments
   - Color-coded icons and descriptions
-  - Placeholder alerts (to be implemented with full CRUD functionality)
+  - Permission-based access control
+- Clients management (full CRUD)
+  - **Permission-based access** - Requires "/admin/client" permissions (Access, Add, Edit, Delete)
+  - Endpoint: GET/POST /api/admin/client, GET/PUT/DELETE /api/admin/client/:id
+  - List view with active/deleted/total stats
+  - Create new client with form validation
+  - Edit existing client details
+  - Soft delete with reason required
+  - Fields: firstName, middleName (optional), lastName, email, phone, address
+  - Status indicators (ACTIVE/DELETED)
+  - Pull-to-refresh functionality
+  - Modal-based forms for add/edit
 
 ❌ **Not Yet Implemented:**
 
 - Backend integration (API endpoints not live)
-- Client/Loan/Payment management screens
+- Loan/Cycle/Payment management screens
 - Role-based navigation (partially implemented)
 
 ### User Roles (Planned)
@@ -1150,6 +1161,138 @@ GET /api/profile/userledger?type=WITHDRAWAL
 
 // Get completed earnings
 GET /api/profile/userledger?status=Completed&type=EARNING
+```
+
+### Clients API Details
+
+**GET /api/admin/client**
+
+Fetches all clients from the system. Requires "Access" permission for "/admin/client".
+
+**Query Parameters (all optional):**
+- `status`: Filter by status (not commonly used, but available)
+- `email`: Search by email (regex, case-insensitive)
+- `firstName`: Search by first name (regex, case-insensitive)
+- `lastName`: Search by last name (regex, case-insensitive)
+- `phone`: Search by phone (regex, case-insensitive)
+- `address`: Search by address (regex, case-insensitive)
+
+**Response:**
+```typescript
+Client[] = [
+  {
+    _id: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    phone: string;
+    email: string;
+    address: string;
+    status: "ACTIVE" | "DELETED";
+    createdAt: string;
+    updatedAt: string;
+    createdBy?: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    updatedBy?: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    deletedAt?: string;
+    deletedBy?: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    deletedReason?: string;
+  }
+]
+```
+
+**POST /api/admin/client**
+
+Creates a new client. Requires "Add" permission for "/admin/client".
+
+**Request Body:**
+```typescript
+{
+  firstName: string;      // Required
+  middleName?: string;    // Optional
+  lastName: string;       // Required
+  phone: string;          // Required
+  email: string;          // Required, must be unique
+  address: string;        // Required
+}
+```
+
+**Response:** Returns the created client with populated fields.
+
+**GET /api/admin/client/:id**
+
+Fetches a single client by ID. Requires "Access" permission for "/admin/client".
+
+**Response:** Returns the client object.
+
+**PUT /api/admin/client/:id**
+
+Updates an existing client. Requires "Edit" permission for "/admin/client".
+
+**Request Body:** Same as POST (all fields optional, only provided fields are updated).
+
+**Response:** Returns the updated client with populated fields.
+
+**DELETE /api/admin/client/:id**
+
+Soft deletes a client (sets status to DELETED). Requires "Delete" permission for "/admin/client".
+
+**Request Body:**
+```typescript
+{
+  reason: string;  // Required - reason for deletion
+}
+```
+
+**Response:** Returns the deleted client with deletedAt, deletedBy, and deletedReason populated.
+
+**Usage Examples:**
+```typescript
+// Get all clients
+const clients = await apiRequest<Client[]>("/api/admin/client");
+
+// Create new client
+const newClient = await apiRequest("/api/admin/client", {
+  method: "POST",
+  body: JSON.stringify({
+    firstName: "Juan",
+    middleName: "Cruz",
+    lastName: "Dela Cruz",
+    email: "juan@example.com",
+    phone: "09123456789",
+    address: "123 Main St, Manila",
+  }),
+});
+
+// Update client
+await apiRequest(`/api/admin/client/${clientId}`, {
+  method: "PUT",
+  body: JSON.stringify({
+    phone: "09987654321",
+  }),
+});
+
+// Delete client
+await apiRequest(`/api/admin/client/${clientId}`, {
+  method: "DELETE",
+  body: JSON.stringify({
+    reason: "Duplicate entry",
+  }),
+});
 ```
 
 ### Request/Response Patterns
