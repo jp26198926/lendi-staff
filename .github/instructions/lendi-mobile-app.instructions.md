@@ -31,6 +31,9 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
 
 - **App Name:** LENDI
 - **Backend:** NextJS at `C:\FILES\PROGRAM\NEXTJS\lending-app` (planned integration)
+  - **Important:** Always reference backend codebase for exact API data structures
+  - **Dashboard API:** `C:\FILES\PROGRAM\NEXTJS\lending-app\app\api\admin\dashboard\route.ts`
+  - **Backend Structure:** API routes in `/app/api/`, Models in `/models/`, Utils in `/lib/`
 - **Framework:** Expo SDK 54+ (54.0.33) + React Native 0.81.5
 - **React Version:** 19.1.0 (SDK 54 ships with this, do NOT upgrade to 19.2.5)
 - **Language:** TypeScript (strict mode enabled)
@@ -51,15 +54,20 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
 - Standard Expo dependencies installed
 - Zentyal theme colors (orange #ff6f00, yellow-green #a4c639) implemented
 
-❌ **Not Yet Implemented:**
+✅ **Recently Implemented:**
 
 - Authentication system (AuthContext, login screen, biometric)
 - API client utility
-- Backend integration
-- User role management
-- Client/Loan/Cycle/Payment management screens
-- Secure storage setup
 - Environment variables (.env file)
+- Secure storage setup
+- Dashboard screen with statistics
+- Profile/Menu screen with settings
+
+❌ **Not Yet Implemented:**
+
+- Backend integration (API endpoints not live)
+- Client/Loan/Payment management screens
+- Role-based navigation (partially implemented)
 
 ### User Roles (Planned)
 
@@ -1002,15 +1010,52 @@ interface Permissions {
 
 ```typescript
 interface DashboardStats {
+  // Primary Metrics
+  cashOnHand: number;
+  userWithdrawableCash: number;
   totalClients: number;
-  activeClients: number;
-  totalLoans: number;
+  totalStaffs: number;
+
+  // Secondary Metrics
   activeLoans: number;
-  totalDisbursed: number;
-  totalCollected: number;
-  outstandingBalance: number;
-  recentLoans: Loan[];
-  recentPayments: Payment[];
+  totalOutstanding: number;
+  collectionsThisMonth: number;
+  overdueCycles: number;
+
+  // Analytics
+  paymentCollections: Array<{
+    _id: string;
+    totalAmount: number;
+    count: number;
+  }>;
+  loanDisbursements: Array<{
+    _id: string;
+    totalAmount: number;
+    count: number;
+  }>;
+  recentActivities: Array<{
+    _id: string;
+    amount: number;
+    datePaid: string;
+    loanId: {
+      loanNumber: string;
+      clientId: {
+        firstName: string;
+        lastName: string;
+      };
+    };
+  }>;
+  loanStatusDistribution: Array<{
+    _id: string;
+    count: number;
+  }>;
+
+  // Metadata
+  period: string;
+  dateRange: {
+    start: string;
+    end: string;
+  };
 }
 ```
 
@@ -1757,20 +1802,20 @@ export default function TabsLayout() {
 
 **Current Structure (✅ = exists, ❌ = needs to be created):**
 
-```
+````
 ✅ app/
-  ✅ _layout.tsx              # Root layout (needs AuthProvider)
+  ✅ _layout.tsx              # Root layout with AuthProvider
   ✅ modal.tsx                # Sample modal screen
+  ✅ index.tsx                # Entry/splash screen with auth redirect
+  ✅ login.tsx                # Login screen with biometric support
   ✅ (tabs)/                  # Tab navigation (protected)
-    ✅ _layout.tsx            # Tabs layout (needs role-based rendering)
-    ✅ index.tsx              # Dashboard (needs implementation)
-    ✅ explore.tsx            # Explore screen (can be repurposed)
-  ❌ index.tsx                # Entry/splash screen with auth redirect (TO CREATE)
-  ❌ login.tsx                # Login screen (TO CREATE)
+    ✅ _layout.tsx            # Tabs layout with role-based rendering
+    ✅ index.tsx              # Dashboard with statistics
+    ✅ explore.tsx            # Legacy explore screen (hidden)
+    ✅ profile.tsx            # Profile/menu screen with settings
   ❌ clients.tsx              # Client list (admin/users only) (TO CREATE)
   ❌ loans.tsx                # Loan list (TO CREATE)
   ❌ payments.tsx             # Payment list (admin/users only) (TO CREATE)
-  ❌ profile.tsx              # User profile (TO CREATE)
   ❌ clients/                 # Client management screens (TO CREATE)
     ❌ [id].tsx              # Client detail
     ❌ add.tsx               # Add client form
@@ -1795,19 +1840,18 @@ export default function TabsLayout() {
     ✅ icon-symbol.tsx        # Icon symbol component
 
 ✅ constants/
-  ✅ theme.ts                 # Theme colors (needs Zentyal colors)
+  ✅ theme.ts                 # Theme colors with Zentyal colors
+  ✅ AppConfig.ts             # App configuration, enums, storage keys
 
 ✅ hooks/
   ✅ use-color-scheme.ts      # Color scheme hook
   ✅ use-theme-color.ts       # Theme color hook
 
-❌ contexts/                  # TO CREATE
-  ❌ AuthContext.tsx          # Authentication state management
+✅ contexts/
+  ✅ AuthContext.tsx          # Authentication state management
 
-❌ utils/                     # TO CREATE
-  ❌ apiClient.ts             # API request utility
-
-❌ constants/AppConfig.ts     # TO CREATE (App configuration, enums, storage keys)
+✅ utils/
+  ✅ apiClient.ts             # API request utility
 
 ✅ assets/
   ✅ images/                  # Image assets
@@ -1820,7 +1864,7 @@ export default function TabsLayout() {
 ✅ tsconfig.json              # TypeScript configuration
 ✅ expo-env.d.ts              # Expo environment types
 ❌ .env                       # TO CREATE (environment variables)
-```
+✅ .env                       # Environment variables
 
 ## Accessibility
 
@@ -1850,7 +1894,7 @@ import { View, Text, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { ZentyalColors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/utils/apiClient";
-```
+````
 
 ## Offline Support & Caching
 
@@ -2358,20 +2402,20 @@ import { Ionicons } from '@expo/vector-icons';
 - [x] Standard Expo components and hooks
 - [x] Entry point configured in package.json
 - [x] Zentyal theme colors implemented (constants/theme.ts)
+- [x] Install authentication dependencies (`expo-secure-store`, `expo-local-authentication`, `@react-native-async-storage/async-storage`)
+- [x] Create .env file with API configuration
+- [x] Create constants/AppConfig.ts with enums and config
+- [x] Create contexts/AuthContext.tsx
+- [x] Create utils/apiClient.ts
+- [x] Create app/index.tsx (splash/auth check screen)
+- [x] Create app/login.tsx
+- [x] Update app/\_layout.tsx with AuthProvider
+- [x] Update app/(tabs)/\_layout.tsx with role-based navigation
+- [x] Create app/(tabs)/profile.tsx
+- [x] Implement dashboard screen (app/(tabs)/index.tsx)
 
 ### ❌ To Be Implemented
 
-- [ ] Install authentication dependencies (`expo-secure-store`, `expo-local-authentication`, `@react-native-async-storage/async-storage`)
-- [ ] Create .env file with API configuration
-- [ ] Create constants/AppConfig.ts with enums and config
-- [ ] Create contexts/AuthContext.tsx
-- [ ] Create utils/apiClient.ts
-- [ ] Create app/index.tsx (splash/auth check screen)
-- [ ] Create app/login.tsx
-- [ ] Update app/\_layout.tsx with AuthProvider
-- [ ] Update app/(tabs)/\_layout.tsx with role-based navigation
-- [ ] Create app/(tabs)/profile.tsx
-- [ ] Implement dashboard screen (app/(tabs)/index.tsx)
 - [ ] Create client management screens (app/clients/)
 - [ ] Create loan management screens (app/loans/)
 - [ ] Create payment management screens (app/payments/)

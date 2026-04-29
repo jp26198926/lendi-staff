@@ -144,6 +144,19 @@ export default function LoginScreen() {
               <Text style={styles.biometricText}>Use Biometric</Text>
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            style={styles.serverSettingsButton}
+            onPress={() => router.push("/server-settings")}
+            disabled={loading}
+          >
+            <Ionicons
+              name="settings-outline"
+              size={18}
+              color={ZentyalColors.gray}
+            />
+            <Text style={styles.serverSettingsText}>Server Settings</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -216,5 +229,17 @@ const styles = StyleSheet.create({
   biometricText: {
     fontSize: 16,
     color: ZentyalColors.primary,
+  },
+  serverSettingsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+    gap: 8,
+    marginTop: 8,
+  },
+  serverSettingsText: {
+    fontSize: 14,
+    color: ZentyalColors.gray,
   },
 });

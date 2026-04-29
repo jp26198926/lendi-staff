@@ -4,8 +4,18 @@
  */
 
 // API Configuration
+// NOTE: BASE_URL is the DEFAULT/FALLBACK URL from environment variables
+// Users can override this by configuring a custom URL in Server Settings
 export const API_CONFIG = {
-  BASE_URL: process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000",
+  // Use localhost for web, your computer's IP for mobile
+  // This is only used as a fallback if no custom URL is configured
+  BASE_URL: (() => {
+    // if (Platform.OS === "web") {
+    //   return process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
+    // }
+    // For mobile devices (iOS/Android), use your computer's local IP
+    return process.env.EXPO_PUBLIC_API_URL || "http://10.10.1.136:3000";
+  })(),
   TIMEOUT: 30000, // 30 seconds
 };
 
@@ -17,6 +27,7 @@ export const STORAGE_KEYS = {
   CACHED_DASHBOARD: "dashboard-data",
   CACHED_CLIENTS: "clients-list",
   CACHED_LOANS: "loans-list",
+  SERVER_API_URL: "server-api-url",
 };
 
 // Pagination Settings

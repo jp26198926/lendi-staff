@@ -1,10 +1,37 @@
 /**
  * API Client Utility
  * Handles authenticated API requests with JWT token management
+ *
+ * Server URL Priority:
+ * 1. Custom URL from Server Settings (user configured)
+ * 2. EXPO_PUBLIC_API_URL from .env (fallback)
+ * 3. Hardcoded default (http://localhost:3000 for web, http://10.10.1.136:3000 for mobile)
  */
 
 import { API_CONFIG, STORAGE_KEYS } from "@/constants/AppConfig";
 import * as SecureStorage from "@/utils/secureStorage";
+
+// Callback for handling 401 unauthorized errors (token expiration)
+let onUnauthorized: (() => void) | null = null;
+
+/**
+ * Set callback for handling unauthorized errors
+ */
+export function setUnauthorizedHandler(handler: () => void) {
+  onUnauthorized = handler;
+}
+
+/**
+ * Get the current effective API base URL
+ * Checks for custom URL first, then falls back to environment variable
+ * @returns The current API base URL
+ */
+export async function getEffectiveApiUrl(): Promise<string> {
+  const customServerUrl = await SecureStorage.getItemAsync(
+    STORAGE_KEYS.SERVER_API_URL,
+  );
+  return customServerUrl || API_CONFIG.BASE_URL;
+}
 
 /**
  * Make an authenticated API request
@@ -20,14 +47,34 @@ export async function apiRequest<T>(
   // Retrieve auth token from secure storage
   const token = await SecureStorage.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
 
-  const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, {
+  // Get custom server URL if configured
+  const customServerUrl = await SecureStorage.getItemAsync(
+    STORAGE_KEYS.SERVER_API_URL,
+  );
+  const baseUrl = customServerUrl || API_CONFIG.BASE_URL;
+
+  const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(token && { Cookie: `auth-token=${token}` }),
+      "X-Client-Type": "mobile", // Required by backend for CORS
+      ...(token && { Authorization: `Bearer ${token}` }),
       ...options?.headers,
     },
+    credentials: "include", // Include cookies for web
   });
+
+  // Handle 401 Unauthorized (token expired)
+  if (response.status === 401) {
+    await SecureStorage.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+    await SecureStorage.deleteItemAsync(STORAGE_KEYS.REMEMBER_ME);
+
+    if (onUnauthorized) {
+      onUnauthorized();
+    }
+
+    throw new Error("Session expired. Please login again.");
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({

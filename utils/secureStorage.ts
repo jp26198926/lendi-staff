@@ -12,10 +12,7 @@ const isWeb = Platform.OS === "web";
 /**
  * Save a key-value pair to secure storage
  */
-export async function setItemAsync(
-  key: string,
-  value: string,
-): Promise<void> {
+export async function setItemAsync(key: string, value: string): Promise<void> {
   if (isWeb) {
     await AsyncStorage.setItem(key, value);
   } else {

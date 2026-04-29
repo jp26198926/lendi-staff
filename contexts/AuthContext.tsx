@@ -4,7 +4,7 @@
  */
 
 import { STORAGE_KEYS } from "@/constants/AppConfig";
-import { apiRequest } from "@/utils/apiClient";
+import { apiRequest, setUnauthorizedHandler } from "@/utils/apiClient";
 import * as SecureStorage from "@/utils/secureStorage";
 import * as LocalAuthentication from "expo-local-authentication";
 import {
@@ -67,6 +67,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check biometric status and remember me on mount
   useEffect(() => {
+    // Set up handler for token expiration (401 errors)
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setPermissions({});
+      setLoading(false);
+    });
+
     checkBiometricStatus();
     checkRememberMe();
   }, []);
@@ -85,7 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Check if user has "Remember Me" enabled and refresh auth
    */
   async function checkRememberMe() {
-    const rememberMe = await SecureStorage.getItemAsync(STORAGE_KEYS.REMEMBER_ME);
+    const rememberMe = await SecureStorage.getItemAsync(
+      STORAGE_KEYS.REMEMBER_ME,
+    );
     if (rememberMe === "true") {
       await refreshAuth();
     } else {
@@ -100,15 +109,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await apiRequest<{
       message: string;
       token: string;
-      user: User;
-      permissions: Permissions;
+      user: {
+        _id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        roleId: {
+          _id: string;
+          role: string;
+        };
+      };
+      permissions: Array<{
+        page: { path: string };
+        permissions: Array<{ permission: string }>;
+      }>;
     }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
 
+    // Debug: Log response structure
+    console.log("Login response:", JSON.stringify(response, null, 2));
+
+    // Validate response
+    if (!response.token || typeof response.token !== "string") {
+      console.error("Invalid token:", response.token);
+      throw new Error("Invalid token received from server");
+    }
+
+    if (!response.user) {
+      console.error("Invalid user data:", response.user);
+      throw new Error("Invalid user data received from server");
+    }
+
+    // Transform user data to match expected format
+    const user: User = {
+      userId: response.user._id,
+      email: response.user.email,
+      roleId: response.user.roleId._id,
+      name: `${response.user.firstName} ${response.user.lastName}`,
+    };
+
+    // Transform permissions to match expected format
+    const permissions: Permissions = {};
+    response.permissions.forEach((item) => {
+      const pagePath = item.page.path;
+      permissions[pagePath] = {};
+      item.permissions.forEach((perm) => {
+        permissions[pagePath][perm.permission] = true;
+      });
+    });
+
     // Store token securely
     await SecureStorage.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, response.token);
+    console.log("✅ Token saved successfully");
 
     // Store remember me preference
     if (rememberMe) {
@@ -117,8 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await SecureStorage.deleteItemAsync(STORAGE_KEYS.REMEMBER_ME);
     }
 
-    setUser(response.user);
-    setPermissions(response.permissions);
+    setUser(user);
+    setPermissions(permissions);
   }
 
   /**
@@ -145,12 +199,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const response = await apiRequest<{
-        user: User;
-        permissions: Permissions;
+        user: {
+          _id: string;
+          email: string;
+          firstName: string;
+          lastName: string;
+          roleId: {
+            _id: string;
+            role: string;
+          };
+        };
+        permissions: Array<{
+          page: { path: string };
+          permissions: Array<{ permission: string }>;
+        }>;
       }>("/api/auth/session");
 
-      setUser(response.user);
-      setPermissions(response.permissions);
+      // Transform user data
+      const user: User = {
+        userId: response.user._id,
+        email: response.user.email,
+        roleId: response.user.roleId._id,
+        name: `${response.user.firstName} ${response.user.lastName}`,
+      };
+
+      // Transform permissions
+      const permissions: Permissions = {};
+      response.permissions.forEach((item) => {
+        const pagePath = item.page.path;
+        permissions[pagePath] = {};
+        item.permissions.forEach((perm) => {
+          permissions[pagePath][perm.permission] = true;
+        });
+      });
+
+      setUser(user);
+      setPermissions(permissions);
     } catch (error) {
       console.error("Session refresh failed:", error);
       await SecureStorage.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);

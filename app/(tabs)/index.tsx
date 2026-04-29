@@ -1,98 +1,398 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+/**
+ * Dashboard Screen
+ * Displays lending statistics and recent activity
+ */
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { ZentyalColors } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/utils/apiClient";
+import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-export default function HomeScreen() {
+interface DashboardStats {
+  // Primary Metrics
+  cashOnHand: number;
+  userWithdrawableCash: number;
+  totalClients: number;
+  totalStaffs: number;
+
+  // Secondary Metrics
+  activeLoans: number;
+  totalOutstanding: number;
+  collectionsThisMonth: number;
+  overdueCycles: number;
+
+  // Analytics
+  paymentCollections: Array<{
+    _id: string;
+    totalAmount: number;
+    count: number;
+  }>;
+  loanDisbursements: Array<{
+    _id: string;
+    totalAmount: number;
+    count: number;
+  }>;
+  recentActivities: Array<{
+    _id: string;
+    amount: number;
+    datePaid: string;
+    loanId: {
+      loanNumber: string;
+      clientId: {
+        firstName: string;
+        lastName: string;
+      };
+    };
+  }>;
+  loanStatusDistribution: Array<{
+    _id: string;
+    count: number;
+  }>;
+
+  // Metadata
+  period: string;
+  dateRange: {
+    start: string;
+    end: string;
+  };
+}
+
+export default function DashboardScreen() {
+  const { user } = useAuth();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * Fetch dashboard statistics
+   */
+  async function fetchDashboard() {
+    try {
+      const response = await apiRequest<{
+        success: boolean;
+        data: DashboardStats;
+      }>("/api/admin/dashboard");
+      setStats(response.data);
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to load dashboard",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handle pull-to-refresh
+   */
+  async function handleRefresh() {
+    setRefreshing(true);
+    await fetchDashboard();
+    setRefreshing(false);
+  }
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={ZentyalColors.primary} />
+        <Text style={styles.loadingText}>Loading dashboard...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          colors={[ZentyalColors.primary]}
+          tintColor={ZentyalColors.primary}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+      }
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.greeting}>Welcome back,</Text>
+        <Text style={styles.username}>
+          {user?.name || user?.email || "User"}
+        </Text>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {/* Stats Grid */}
+      {stats && (
+        <View style={styles.statsGrid}>
+          <StatCard
+            icon="cash"
+            label="Cash on Hand"
+            value={`₱${formatCurrency(stats.cashOnHand)}`}
+            subtitle="Available"
+            color={ZentyalColors.success}
+          />
+          <StatCard
+            icon="wallet"
+            label="Your Withdrawable"
+            value={`₱${formatCurrency(stats.userWithdrawableCash)}`}
+            subtitle="Personal balance"
+            color={ZentyalColors.info}
+          />
+          <StatCard
+            icon="people"
+            label="Total Clients"
+            value={stats.totalClients}
+            subtitle="Active clients"
+            color={ZentyalColors.primary}
+          />
+          <StatCard
+            icon="person"
+            label="Total Staffs"
+            value={stats.totalStaffs}
+            subtitle="Active users"
+            color={ZentyalColors.accent}
+          />
+          <StatCard
+            icon="document-text"
+            label="Active Loans"
+            value={stats.activeLoans}
+            subtitle="Currently running"
+            color={ZentyalColors.primary}
+          />
+          <StatCard
+            icon="trending-up"
+            label="Outstanding"
+            value={`₱${formatCurrency(stats.totalOutstanding)}`}
+            subtitle="Total balance"
+            color={ZentyalColors.warning}
+          />
+          <StatCard
+            icon="calendar"
+            label="This Month"
+            value={`₱${formatCurrency(stats.collectionsThisMonth)}`}
+            subtitle="Collections"
+            color={ZentyalColors.success}
+          />
+          <StatCard
+            icon="alert-circle"
+            label="Overdue"
+            value={stats.overdueCycles}
+            subtitle="Past due date"
+            color={ZentyalColors.danger}
+          />
+        </View>
+      )}
+
+      {/* Quick Actions */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.actionsGrid}>
+          <ActionButton icon="person-add" label="New Client" />
+          <ActionButton icon="add-circle" label="New Loan" />
+          <ActionButton icon="card" label="Record Payment" />
+          <ActionButton icon="document-text" label="Reports" />
+        </View>
+      </View>
+    </ScrollView>
   );
 }
 
+/**
+ * Stat Card Component
+ */
+interface StatCardProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string | number;
+  subtitle?: string;
+  color: string;
+  fullWidth?: boolean;
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  subtitle,
+  color,
+  fullWidth,
+}: StatCardProps) {
+  return (
+    <View style={[styles.statCard, fullWidth && styles.statCardFull]}>
+      <View
+        style={[styles.statIconContainer, { backgroundColor: color + "20" }]}
+      >
+        <Ionicons name={icon} size={24} color={color} />
+      </View>
+      <View style={styles.statContent}>
+        <Text style={styles.statLabel}>{label}</Text>
+        <Text style={styles.statValue}>{value}</Text>
+        {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Action Button Component
+ */
+interface ActionButtonProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+}
+
+function ActionButton({ icon, label }: ActionButtonProps) {
+  return (
+    <View style={styles.actionButton}>
+      <View style={styles.actionIconContainer}>
+        <Ionicons name={icon} size={28} color={ZentyalColors.primary} />
+      </View>
+      <Text style={styles.actionLabel}>{label}</Text>
+    </View>
+  );
+}
+
+/**
+ * Format currency with commas
+ */
+function formatCurrency(value: number): string {
+  return value.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: ZentyalColors.light,
   },
-  stepContainer: {
-    gap: 8,
+  contentContainer: {
+    padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: ZentyalColors.light,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: ZentyalColors.gray,
+  },
+  header: {
+    marginBottom: 24,
+  },
+  greeting: {
+    fontSize: 16,
+    color: ZentyalColors.gray,
+  },
+  username: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: ZentyalColors.dark,
+    marginTop: 4,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    width: "48%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statCardFull: {
+    width: "100%",
+  },
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  statContent: {
+    gap: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: ZentyalColors.gray,
+    fontWeight: "500",
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: ZentyalColors.dark,
+  },
+  statSubtitle: {
+    fontSize: 11,
+    color: ZentyalColors.gray,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: ZentyalColors.dark,
+    marginBottom: 16,
+  },
+  actionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  actionButton: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    width: "48%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  actionIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: ZentyalColors.primary + "20",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: ZentyalColors.dark,
+    textAlign: "center",
   },
 });
