@@ -7,6 +7,7 @@ import { ZentyalColors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/utils/apiClient";
 import { Ionicons } from "@expo/vector-icons";
+import * as LocalAuthentication from "expo-local-authentication";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -175,9 +176,63 @@ export default function ProfileScreen() {
   }
 
   /**
+   * Verify biometric authentication for sensitive operations
+   */
+  async function verifyBiometric(): Promise<boolean> {
+    // Skip biometric if not enabled
+    if (!biometricEnabled) {
+      return true;
+    }
+
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        // Biometric is enabled in settings but not available on device
+        Alert.alert(
+          "Biometric Unavailable",
+          "Biometric authentication is not available on this device. Proceeding without verification.",
+        );
+        return true;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Verify your identity",
+        fallbackLabel: "Use password",
+        cancelLabel: "Cancel",
+        disableDeviceFallback: false,
+      });
+
+      if (!result.success) {
+        Alert.alert(
+          "Authentication Failed",
+          "Biometric authentication failed. Please try again.",
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Biometric verification error:", error);
+      Alert.alert(
+        "Error",
+        "Failed to verify biometric authentication. Please try again.",
+      );
+      return false;
+    }
+  }
+
+  /**
    * Handle change password
    */
-  function handleChangePassword() {
+  async function handleChangePassword() {
+    // Verify biometric first if enabled
+    const verified = await verifyBiometric();
+    if (!verified) {
+      return;
+    }
+
     setOldPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -261,8 +316,15 @@ export default function ProfileScreen() {
   /**
    * Handle withdrawal
    */
-  function handleWithdrawal() {
+  async function handleWithdrawal() {
     if (!profile) return;
+
+    // Verify biometric first if enabled
+    const verified = await verifyBiometric();
+    if (!verified) {
+      return;
+    }
+
     setWithdrawAmount("");
     setWithdrawModalVisible(true);
   }
@@ -728,9 +790,7 @@ export default function ProfileScreen() {
                 style={[styles.modalButton, styles.modalConfirmButton]}
                 onPress={processChangePassword}
               >
-                <Text style={styles.modalConfirmButtonText}>
-                  Change Password
-                </Text>
+                <Text style={styles.modalConfirmButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -63,11 +63,13 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
 - Dashboard screen with statistics
 - Profile/Menu screen with settings
 - Withdrawal process (profile page)
+  - Biometric verification required before withdrawal (if enabled)
 - Change Password feature (profile page)
   - Endpoint: POST /api/profile/change-password
   - Requires: oldPassword, newPassword, confirmPassword
   - Validates: password length (min 6), matching confirmation, different from old
   - Auto-logout after successful password change
+  - Biometric verification required before changing password (if enabled)
 - User Ledger screen (transaction history)
   - Endpoint: GET /api/profile/userledger
   - Displays: CAPITAL_IN, EARNING, WITHDRAWAL transactions
