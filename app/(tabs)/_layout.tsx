@@ -90,6 +90,21 @@ export default function TabLayout() {
         />
       )}
 
+      {/* Manage Tab */}
+      <Tabs.Screen
+        name="manage"
+        options={{
+          title: "Manage",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "cash" : "cash-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
       {/* Profile Tab */}
       <Tabs.Screen
         name="profile"

@@ -92,6 +92,11 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
   - Status indicators (Completed/Cancelled)
   - Pull-to-refresh functionality
   - Supports pull-to-refresh
+- Manage screen (tab navigation)
+  - Menu interface for managing system entities
+  - 4 main sections: Clients, Loans, Cycles, Payments
+  - Color-coded icons and descriptions
+  - Placeholder alerts (to be implemented with full CRUD functionality)
 
 ❌ **Not Yet Implemented:**
 
