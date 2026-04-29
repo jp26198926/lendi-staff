@@ -12,11 +12,13 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -49,6 +51,8 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
 
   /**
    * Fetch full profile data from backend
@@ -71,7 +75,7 @@ export default function ProfileScreen() {
               text: "OK",
               onPress: () => router.replace("/login"),
             },
-          ]
+          ],
         );
       } else {
         Alert.alert(
@@ -169,6 +173,97 @@ export default function ProfileScreen() {
     Alert.alert("Change Password", "This feature will be implemented soon");
   }
 
+  /**
+   * Handle withdrawal
+   */
+  function handleWithdrawal() {
+    if (!profile) return;
+    setWithdrawAmount("");
+    setWithdrawModalVisible(true);
+  }
+
+  /**
+   * Process withdrawal
+   */
+  async function processWithdrawal() {
+    if (!profile) return;
+
+    // Validate input
+    if (!withdrawAmount || withdrawAmount.trim() === "") {
+      Alert.alert("Error", "Please enter a valid amount");
+      return;
+    }
+
+    const amount = parseFloat(withdrawAmount);
+
+    // Check if amount is a valid number
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert("Error", "Please enter a valid amount greater than 0");
+      return;
+    }
+
+    // Check if user has sufficient balance
+    if (amount > profile.cashWithdrawable) {
+      Alert.alert(
+        "Insufficient Balance",
+        `You only have ${formatCurrency(profile.cashWithdrawable)} available to withdraw.`,
+      );
+      return;
+    }
+
+    // Close modal first
+    setWithdrawModalVisible(false);
+
+    // Confirm withdrawal
+    Alert.alert(
+      "Confirm Withdrawal",
+      `Are you sure you want to withdraw ${formatCurrency(amount)}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          style: "default",
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              const response = await apiRequest<{
+                message: string;
+                data: {
+                  amount: number;
+                  newCashWithdrawable: number;
+                  newTotalWithdrawn: number;
+                  userLedgerId: string;
+                  ledgerId: string;
+                };
+              }>("/api/profile/withdraw", {
+                method: "POST",
+                body: JSON.stringify({ amount }),
+              });
+
+              // Refresh profile to get updated balances
+              await fetchProfile();
+
+              Alert.alert(
+                "Success",
+                `Successfully withdrew ${formatCurrency(response.data.amount)}\n\nNew balance: ${formatCurrency(response.data.newCashWithdrawable)}`,
+              );
+            } catch (error) {
+              Alert.alert(
+                "Withdrawal Failed",
+                error instanceof Error
+                  ? error.message
+                  : "Failed to process withdrawal",
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -179,177 +274,243 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          colors={[ZentyalColors.primary]}
-          tintColor={ZentyalColors.primary}
-        />
-      }
-    >
-      {/* User Info Card */}
-      <View style={styles.userCard}>
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarText}>
-            {profile?.firstName?.[0]?.toUpperCase() || "U"}
-            {profile?.lastName?.[0]?.toUpperCase() || ""}
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[ZentyalColors.primary]}
+            tintColor={ZentyalColors.primary}
+          />
+        }
+      >
+        {/* User Info Card */}
+        <View style={styles.userCard}>
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>
+              {profile?.firstName?.[0]?.toUpperCase() || "U"}
+              {profile?.lastName?.[0]?.toUpperCase() || ""}
+            </Text>
+          </View>
+          <Text style={styles.userName}>
+            {profile?.firstName} {profile?.lastName}
           </Text>
-        </View>
-        <Text style={styles.userName}>
-          {profile?.firstName} {profile?.lastName}
-        </Text>
-        <Text style={styles.userEmail}>{profile?.email}</Text>
-        <Text style={styles.userPhone}>{profile?.phone}</Text>
-        <View style={styles.roleChip}>
-          <Text style={styles.roleText}>
-            {typeof profile?.roleId === "object"
-              ? profile?.roleId.role
-              : "User"}
-          </Text>
-        </View>
-      </View>
-
-      {/* Financial Overview */}
-      {profile && (
-        <View style={styles.financialSection}>
-          <Text style={styles.sectionTitle}>Financial Overview</Text>
-          <View style={styles.financialGrid}>
-            <FinancialCard
-              icon="wallet"
-              label="Withdrawable Cash"
-              value={formatCurrency(profile.cashWithdrawable)}
-              color={ZentyalColors.success}
-            />
-            <FinancialCard
-              icon="cash"
-              label="Capital Contribution"
-              value={formatCurrency(profile.capitalContribution)}
-              color={ZentyalColors.primary}
-            />
-            <FinancialCard
-              icon="trending-up"
-              label="Profit Earned"
-              value={formatCurrency(profile.profitEarned)}
-              color={ZentyalColors.accent}
-            />
-            <FinancialCard
-              icon="arrow-down"
-              label="Total Withdrawn"
-              value={formatCurrency(profile.totalWithdrawn)}
-              color={ZentyalColors.info}
-            />
-            <FinancialCard
-              icon="stats-chart"
-              label="Rate"
-              value={`${profile.rate}%`}
-              color={ZentyalColors.warning}
-              fullWidth
-            />
+          <Text style={styles.userEmail}>{profile?.email}</Text>
+          <Text style={styles.userPhone}>{profile?.phone}</Text>
+          <View style={styles.roleChip}>
+            <Text style={styles.roleText}>
+              {typeof profile?.roleId === "object"
+                ? profile?.roleId.role
+                : "User"}
+            </Text>
           </View>
         </View>
-      )}
 
-      {/* Security Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security</Text>
+        {/* Financial Overview */}
+        {profile && (
+          <View style={styles.financialSection}>
+            <Text style={styles.sectionTitle}>Financial Overview</Text>
+            <View style={styles.financialGrid}>
+              <FinancialCard
+                icon="wallet"
+                label="Withdrawable Cash"
+                value={formatCurrency(profile.cashWithdrawable)}
+                color={ZentyalColors.success}
+              />
+              <FinancialCard
+                icon="cash"
+                label="Capital Contribution"
+                value={formatCurrency(profile.capitalContribution)}
+                color={ZentyalColors.primary}
+              />
+              <FinancialCard
+                icon="trending-up"
+                label="Profit Earned"
+                value={formatCurrency(profile.profitEarned)}
+                color={ZentyalColors.accent}
+              />
+              <FinancialCard
+                icon="arrow-down"
+                label="Total Withdrawn"
+                value={formatCurrency(profile.totalWithdrawn)}
+                color={ZentyalColors.info}
+              />
+              <FinancialCard
+                icon="stats-chart"
+                label="Rate"
+                value={`${profile.rate}%`}
+                color={ZentyalColors.warning}
+                fullWidth
+              />
+            </View>
 
-        <MenuItem
-          icon="finger-print"
-          label="Biometric Authentication"
-          rightComponent={
-            <Switch
-              value={biometricEnabled}
-              onValueChange={handleBiometricToggle}
-              disabled={biometricLoading}
-              trackColor={{ false: "#ccc", true: ZentyalColors.primary }}
-              thumbColor="#fff"
-            />
-          }
-        />
+            {/* Withdrawal Button */}
+            <TouchableOpacity
+              style={styles.withdrawButton}
+              onPress={handleWithdrawal}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="cash-outline" size={20} color="#fff" />
+              <Text style={styles.withdrawButtonText}>Withdraw Funds</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        <MenuItem
-          icon="key"
-          label="Change Password"
-          onPress={handleChangePassword}
-          showChevron
-        />
-      </View>
+        {/* Security Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Security</Text>
 
-      {/* App Settings Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>App Settings</Text>
+          <MenuItem
+            icon="finger-print"
+            label="Biometric Authentication"
+            rightComponent={
+              <Switch
+                value={biometricEnabled}
+                onValueChange={handleBiometricToggle}
+                disabled={biometricLoading}
+                trackColor={{ false: "#ccc", true: ZentyalColors.primary }}
+                thumbColor="#fff"
+              />
+            }
+          />
 
-        <MenuItem
-          icon="notifications"
-          label="Notifications"
-          onPress={() => Alert.alert("Notifications", "Feature coming soon")}
-          showChevron
-        />
+          <MenuItem
+            icon="key"
+            label="Change Password"
+            onPress={handleChangePassword}
+            showChevron
+          />
+        </View>
 
-        <MenuItem
-          icon="moon"
-          label="Dark Mode"
-          rightComponent={
-            <Switch
-              value={false}
-              onValueChange={() =>
-                Alert.alert("Dark Mode", "Feature coming soon")
-              }
-              trackColor={{ false: "#ccc", true: ZentyalColors.primary }}
-              thumbColor="#fff"
-            />
-          }
-        />
+        {/* App Settings Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App Settings</Text>
 
-        <MenuItem
-          icon="language"
-          label="Language"
-          onPress={() => Alert.alert("Language", "Feature coming soon")}
-          showChevron
-        />
-      </View>
+          <MenuItem
+            icon="notifications"
+            label="Notifications"
+            onPress={() => Alert.alert("Notifications", "Feature coming soon")}
+            showChevron
+          />
 
-      {/* About Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
+          <MenuItem
+            icon="moon"
+            label="Dark Mode"
+            rightComponent={
+              <Switch
+                value={false}
+                onValueChange={() =>
+                  Alert.alert("Dark Mode", "Feature coming soon")
+                }
+                trackColor={{ false: "#ccc", true: ZentyalColors.primary }}
+                thumbColor="#fff"
+              />
+            }
+          />
 
-        <MenuItem
-          icon="information-circle"
-          label="About LENDI"
-          onPress={() =>
-            Alert.alert("LENDI", "Lending Management System v1.0.0")
-          }
-          showChevron
-        />
+          <MenuItem
+            icon="language"
+            label="Language"
+            onPress={() => Alert.alert("Language", "Feature coming soon")}
+            showChevron
+          />
+        </View>
 
-        <MenuItem
-          icon="document-text"
-          label="Terms & Conditions"
-          onPress={() => Alert.alert("Terms", "Feature coming soon")}
-          showChevron
-        />
+        {/* About Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
 
-        <MenuItem
-          icon="shield-checkmark"
-          label="Privacy Policy"
-          onPress={() => Alert.alert("Privacy", "Feature coming soon")}
-          showChevron
-        />
-      </View>
+          <MenuItem
+            icon="information-circle"
+            label="About LENDI"
+            onPress={() =>
+              Alert.alert("LENDI", "Lending Management System v1.0.0")
+            }
+            showChevron
+          />
 
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out" size={20} color="#fff" />
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
+          <MenuItem
+            icon="document-text"
+            label="Terms & Conditions"
+            onPress={() => Alert.alert("Terms", "Feature coming soon")}
+            showChevron
+          />
 
-      {/* App Version */}
-      <Text style={styles.versionText}>Version 1.0.0</Text>
-    </ScrollView>
+          <MenuItem
+            icon="shield-checkmark"
+            label="Privacy Policy"
+            onPress={() => Alert.alert("Privacy", "Feature coming soon")}
+            showChevron
+          />
+        </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Ionicons name="log-out" size={20} color="#fff" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+
+        {/* App Version */}
+        <Text style={styles.versionText}>Version 1.0.0</Text>
+      </ScrollView>
+
+      {/* Withdrawal Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={withdrawModalVisible}
+        onRequestClose={() => setWithdrawModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Withdraw Funds</Text>
+              <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
+                <Ionicons name="close" size={24} color={ZentyalColors.dark} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalAvailable}>
+              Available:{" "}
+              {profile ? formatCurrency(profile.cashWithdrawable) : "0.00"}
+            </Text>
+
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Amount</Text>
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalInput}
+                  value={withdrawAmount}
+                  onChangeText={setWithdrawAmount}
+                  placeholder="0.00"
+                  keyboardType="numeric"
+                  placeholderTextColor={ZentyalColors.gray}
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setWithdrawModalVisible(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={processWithdrawal}
+              >
+                <Text style={styles.modalConfirmButtonText}>Withdraw</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -553,6 +714,26 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: ZentyalColors.dark,
   },
+  withdrawButton: {
+    backgroundColor: ZentyalColors.primary,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  withdrawButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+  },
   section: {
     marginBottom: 24,
   },
@@ -626,5 +807,93 @@ const styles = StyleSheet.create({
     color: ZentyalColors.gray,
     textAlign: "center",
     marginTop: 24,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: ZentyalColors.dark,
+  },
+  modalAvailable: {
+    fontSize: 14,
+    color: ZentyalColors.gray,
+    marginBottom: 20,
+  },
+  modalInputContainer: {
+    marginBottom: 24,
+  },
+  modalInputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: ZentyalColors.dark,
+    marginBottom: 8,
+  },
+  modalInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: ZentyalColors.gray + "40",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    backgroundColor: ZentyalColors.light,
+  },
+  modalInput: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: ZentyalColors.dark,
+    paddingVertical: 14,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  modalCancelButton: {
+    backgroundColor: ZentyalColors.light,
+    borderWidth: 1,
+    borderColor: ZentyalColors.gray + "40",
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: ZentyalColors.dark,
+  },
+  modalConfirmButton: {
+    backgroundColor: ZentyalColors.primary,
+  },
+  modalConfirmButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
   },
 });

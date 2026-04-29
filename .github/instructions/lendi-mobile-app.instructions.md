@@ -240,6 +240,52 @@ export const Colors = {
 import { ZentyalColors } from "@/constants/theme";
 ```
 
+## UI/UX Conventions
+
+### Currency Formatting
+
+**IMPORTANT:** Do NOT use currency symbols (₱, $, etc.) anywhere in the UI.
+
+❌ **Wrong:**
+
+```typescript
+value={`₱${formatCurrency(amount)}`}
+<Text>Available: ₱{balance}</Text>
+```
+
+✅ **Correct:**
+
+```typescript
+value={formatCurrency(amount)}
+<Text>Available: {formatCurrency(balance)}</Text>
+```
+
+**Rationale:**
+
+- Clean, minimalist UI design
+- Avoids font rendering issues with special characters
+- Currency context is already established (Philippine lending app)
+- Numbers are more readable without symbols
+
+**formatCurrency Function:**
+
+```typescript
+function formatCurrency(value: number): string {
+  return value.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+```
+
+This applies to:
+
+- All financial displays (balances, amounts, totals)
+- Input placeholders and labels
+- Alert messages and confirmations
+- Charts and statistics
+- Any monetary value in the UI
+
 ## Authentication Architecture
 
 ### Overview
