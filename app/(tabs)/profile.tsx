@@ -347,15 +347,30 @@ export default function ProfileScreen() {
               />
             </View>
 
-            {/* Withdrawal Button */}
-            <TouchableOpacity
-              style={styles.withdrawButton}
-              onPress={handleWithdrawal}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="cash-outline" size={20} color="#fff" />
-              <Text style={styles.withdrawButtonText}>Withdraw Funds</Text>
-            </TouchableOpacity>
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity
+                style={styles.withdrawButton}
+                onPress={handleWithdrawal}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="cash-outline" size={20} color="#fff" />
+                <Text style={styles.withdrawButtonText}>Withdraw Funds</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.ledgerButton}
+                onPress={() => router.push("/ledger")}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="list-outline"
+                  size={20}
+                  color={ZentyalColors.primary}
+                />
+                <Text style={styles.ledgerButtonText}>View Ledger</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -715,6 +730,7 @@ const styles = StyleSheet.create({
     color: ZentyalColors.dark,
   },
   withdrawButton: {
+    flex: 1,
     backgroundColor: ZentyalColors.primary,
     borderRadius: 12,
     padding: 16,
@@ -722,7 +738,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginTop: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -733,6 +748,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#fff",
+  },
+  actionButtonsContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 16,
+  },
+  ledgerButton: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 2,
+    borderColor: ZentyalColors.primary,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  ledgerButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: ZentyalColors.primary,
   },
   section: {
     marginBottom: 24,

@@ -62,6 +62,13 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
 - Secure storage setup
 - Dashboard screen with statistics
 - Profile/Menu screen with settings
+- Withdrawal process (profile page)
+- User Ledger screen (transaction history)
+  - Endpoint: GET /api/profile/userledger
+  - Displays: CAPITAL_IN, EARNING, WITHDRAWAL transactions
+  - Shows summary cards and detailed transaction list
+  - Filterable by status and type
+  - Supports pull-to-refresh
 
 ❌ **Not Yet Implemented:**
 
@@ -820,7 +827,71 @@ GET    /api/admin/dashboard         - Get dashboard statistics
 Profile:
 GET    /api/profile                 - Get current user profile
 POST   /api/profile/change-password - Change password
-GET    /api/profile/userledger      - Get user's ledger
+POST   /api/profile/withdraw        - Withdraw funds from user balance
+GET    /api/profile/userledger      - Get user's ledger transactions (with optional filters)
+```
+
+### User Ledger API Details
+
+**GET /api/profile/userledger**
+
+Returns the transaction history for the current authenticated user.
+
+**Query Parameters:**
+
+- `status` (optional): Filter by status - "Completed" | "Cancelled"
+- `type` (optional): Filter by type - "CAPITAL_IN" | "EARNING" | "WITHDRAWAL"
+
+**Response:**
+
+```typescript
+UserLedger[] = [
+  {
+    _id: string;
+    date: string;              // ISO date string
+    amount: number;
+    type: "CAPITAL_IN" | "EARNING" | "WITHDRAWAL";
+    status: "Completed" | "Cancelled";
+    userId: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    loanId?: {                // Optional - only for EARNING transactions
+      _id: string;
+      loanNo: string;
+      clientId: string;
+      principal: number;
+      interestRate: number;
+      status: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+    createdBy?: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+  }
+]
+```
+
+**Usage Examples:**
+
+```typescript
+// Get all transactions
+GET /api/profile/userledger
+
+// Get only completed transactions
+GET /api/profile/userledger?status=Completed
+
+// Get only withdrawals
+GET /api/profile/userledger?type=WITHDRAWAL
+
+// Get completed earnings
+GET /api/profile/userledger?status=Completed&type=EARNING
 ```
 
 ### Request/Response Patterns
