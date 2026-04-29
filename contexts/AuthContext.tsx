@@ -15,12 +15,23 @@ import {
   useState,
 } from "react";
 
-// User interface
+// User interface (matches backend User model)
 interface User {
-  userId: string;
+  _id?: string;
+  userId?: string;
   email: string;
-  roleId: string;
-  name?: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  roleId: string | { _id: string; role: string };
+  rate: number;
+  cashWithdrawable: number;
+  capitalContribution: number;
+  profitEarned: number;
+  totalWithdrawn: number;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Permissions interface
@@ -69,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up handler for token expiration (401 errors)
     setUnauthorizedHandler(() => {
+      console.log("🚨 Session expired - clearing auth state");
       setUser(null);
       setPermissions({});
       setLoading(false);
@@ -114,10 +126,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: string;
         firstName: string;
         lastName: string;
+        phone: string;
         roleId: {
           _id: string;
           role: string;
         };
+        rate: number;
+        cashWithdrawable: number;
+        capitalContribution: number;
+        profitEarned: number;
+        totalWithdrawn: number;
+        status: string;
+        createdAt: string;
+        updatedAt: string;
       };
       permissions: Array<{
         page: { path: string };
@@ -142,12 +163,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Invalid user data received from server");
     }
 
-    // Transform user data to match expected format
+    // Store complete user data
     const user: User = {
+      _id: response.user._id,
       userId: response.user._id,
       email: response.user.email,
-      roleId: response.user.roleId._id,
-      name: `${response.user.firstName} ${response.user.lastName}`,
+      firstName: response.user.firstName,
+      lastName: response.user.lastName,
+      phone: response.user.phone,
+      roleId: response.user.roleId,
+      rate: response.user.rate,
+      cashWithdrawable: response.user.cashWithdrawable,
+      capitalContribution: response.user.capitalContribution,
+      profitEarned: response.user.profitEarned,
+      totalWithdrawn: response.user.totalWithdrawn,
+      status: response.user.status,
+      createdAt: response.user.createdAt,
+      updatedAt: response.user.updatedAt,
     };
 
     // Transform permissions to match expected format
@@ -204,10 +236,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: string;
           firstName: string;
           lastName: string;
+          phone: string;
           roleId: {
             _id: string;
             role: string;
           };
+          rate: number;
+          cashWithdrawable: number;
+          capitalContribution: number;
+          profitEarned: number;
+          totalWithdrawn: number;
+          status: string;
+          createdAt: string;
+          updatedAt: string;
         };
         permissions: Array<{
           page: { path: string };
@@ -215,12 +256,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }>;
       }>("/api/auth/session");
 
-      // Transform user data
+      // Store complete user data
       const user: User = {
+        _id: response.user._id,
         userId: response.user._id,
         email: response.user.email,
-        roleId: response.user.roleId._id,
-        name: `${response.user.firstName} ${response.user.lastName}`,
+        firstName: response.user.firstName,
+        lastName: response.user.lastName,
+        phone: response.user.phone,
+        roleId: response.user.roleId,
+        rate: response.user.rate,
+        cashWithdrawable: response.user.cashWithdrawable,
+        capitalContribution: response.user.capitalContribution,
+        profitEarned: response.user.profitEarned,
+        totalWithdrawn: response.user.totalWithdrawn,
+        status: response.user.status,
+        createdAt: response.user.createdAt,
+        updatedAt: response.user.updatedAt,
       };
 
       // Transform permissions

@@ -47,25 +47,45 @@ export async function apiRequest<T>(
   // Retrieve auth token from secure storage
   const token = await SecureStorage.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
 
+  // Debug: Log token status
+  if (token) {
+    console.log(`🔐 Token found for ${endpoint} (length: ${token.length})`);
+  } else {
+    console.log(`⚠️ No token found for ${endpoint}`);
+  }
+
   // Get custom server URL if configured
   const customServerUrl = await SecureStorage.getItemAsync(
     STORAGE_KEYS.SERVER_API_URL,
   );
   const baseUrl = customServerUrl || API_CONFIG.BASE_URL;
 
+  console.log(`📡 API Request: ${baseUrl}${endpoint}`);
+
+  const requestHeaders = {
+    "Content-Type": "application/json",
+    "X-Client-Type": "mobile", // Required by backend for CORS
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options?.headers,
+  };
+
+  // Log request headers (mask token for security)
+  console.log("📤 Request Headers:", {
+    ...requestHeaders,
+    Authorization: token ? `Bearer ${token.substring(0, 20)}...` : "none",
+  });
+
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Client-Type": "mobile", // Required by backend for CORS
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options?.headers,
-    },
+    headers: requestHeaders,
     credentials: "include", // Include cookies for web
   });
 
+  console.log(`📥 Response Status: ${response.status} ${response.statusText}`);
+
   // Handle 401 Unauthorized (token expired)
   if (response.status === 401) {
+    console.error("❌ 401 Unauthorized - Session expired");
     await SecureStorage.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
     await SecureStorage.deleteItemAsync(STORAGE_KEYS.REMEMBER_ME);
 
@@ -80,10 +100,12 @@ export async function apiRequest<T>(
     const error = await response.json().catch(() => ({
       error: "Request failed",
     }));
+    console.error(`❌ API Error (${response.status}):`, error);
     throw new Error(
       error.error || `HTTP ${response.status}: ${response.statusText}`,
     );
   }
 
+  console.log(`✅ API Success: ${endpoint}`);
   return response.json();
 }

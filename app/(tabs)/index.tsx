@@ -132,7 +132,9 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <Text style={styles.greeting}>Welcome back,</Text>
         <Text style={styles.username}>
-          {user?.name || user?.email || "User"}
+          {user?.firstName
+            ? `${user.firstName} ${user.lastName || ""}`
+            : user?.email || "User"}
         </Text>
       </View>
 
