@@ -32,17 +32,17 @@ interface DashboardStats {
   overdueCycles: number;
 
   // Analytics
-  paymentCollections: Array<{
+  paymentCollections: {
     _id: string;
     totalAmount: number;
     count: number;
-  }>;
-  loanDisbursements: Array<{
+  }[];
+  loanDisbursements: {
     _id: string;
     totalAmount: number;
     count: number;
-  }>;
-  recentActivities: Array<{
+  }[];
+  recentActivities: {
     _id: string;
     amount: number;
     datePaid: string;
@@ -53,11 +53,11 @@ interface DashboardStats {
         lastName: string;
       };
     };
-  }>;
-  loanStatusDistribution: Array<{
+  }[];
+  loanStatusDistribution: {
     _id: string;
     count: number;
-  }>;
+  }[];
 
   // Metadata
   period: string;
@@ -142,14 +142,14 @@ export default function DashboardScreen() {
           <StatCard
             icon="cash"
             label="Cash on Hand"
-            value={`₱${formatCurrency(stats.cashOnHand)}`}
+            value={`${formatCurrency(stats.cashOnHand)}`}
             subtitle="Available"
             color={ZentyalColors.success}
           />
           <StatCard
             icon="wallet"
             label="Your Withdrawable"
-            value={`₱${formatCurrency(stats.userWithdrawableCash)}`}
+            value={`${formatCurrency(stats.userWithdrawableCash)}`}
             subtitle="Personal balance"
             color={ZentyalColors.info}
           />
@@ -177,14 +177,14 @@ export default function DashboardScreen() {
           <StatCard
             icon="trending-up"
             label="Outstanding"
-            value={`₱${formatCurrency(stats.totalOutstanding)}`}
+            value={`${formatCurrency(stats.totalOutstanding)}`}
             subtitle="Total balance"
             color={ZentyalColors.warning}
           />
           <StatCard
             icon="calendar"
             label="This Month"
-            value={`₱${formatCurrency(stats.collectionsThisMonth)}`}
+            value={`${formatCurrency(stats.collectionsThisMonth)}`}
             subtitle="Collections"
             color={ZentyalColors.success}
           />

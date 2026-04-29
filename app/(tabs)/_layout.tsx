@@ -6,6 +6,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { ZentyalColors } from "@/constants/theme";
@@ -14,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function TabLayout() {
   const { user, hasPermission } = useAuth();
   const isClient = user?.roleId === "client";
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -34,8 +36,8 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: "#f0f0f0",
           paddingTop: 8,
-          paddingBottom: 8,
-          height: 60,
+          paddingBottom: Math.max(insets.bottom, 8),
+          height: 60 + Math.max(insets.bottom, 0),
         },
       }}
     >

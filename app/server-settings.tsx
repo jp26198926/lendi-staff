@@ -14,14 +14,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const STORAGE_KEY = "server-api-url";
@@ -60,7 +60,7 @@ export default function ServerSettingsScreen() {
     // Basic URL validation
     try {
       new URL(apiUrl);
-    } catch (error) {
+    } catch {
       Alert.alert(
         "Error",
         "Please enter a valid URL (e.g., http://localhost:3000)",
@@ -108,7 +108,7 @@ export default function ServerSettingsScreen() {
               await setItemAsync(STORAGE_KEY, "");
               setApiUrl("");
               Alert.alert("Success", "Server URL has been reset");
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to reset URL");
             }
           },
@@ -223,40 +223,40 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   title: {
-    infoBox: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 12,
-      padding: 12,
-      backgroundColor: "#fff3e0",
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: "#ffe0b2",
-      marginBottom: 24,
-    },
-    infoTextContainer: {
-      flex: 1,
-    },
-    infoText: {
-      fontSize: 12,
-      color: ZentyalColors.dark,
-      lineHeight: 18,
-    },
-    infoLabel: {
-      fontWeight: "600",
-    },
-    infoSubtext: {
-      fontSize: 11,
-      color: ZentyalColors.gray,
-      marginTop: 4,
-      fontStyle: "italic",
-    },
     fontSize: 28,
     fontWeight: "bold",
     color: ZentyalColors.primary,
     textAlign: "center",
     marginTop: 16,
     marginBottom: 8,
+  },
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 12,
+    backgroundColor: "#fff3e0",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ffe0b2",
+    marginBottom: 24,
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoText: {
+    fontSize: 12,
+    color: ZentyalColors.dark,
+    lineHeight: 18,
+  },
+  infoLabel: {
+    fontWeight: "600",
+  },
+  infoSubtext: {
+    fontSize: 11,
+    color: ZentyalColors.gray,
+    marginTop: 4,
+    fontStyle: "italic",
   },
   subtitle: {
     fontSize: 14,
