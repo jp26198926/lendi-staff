@@ -62,6 +62,9 @@ export default function ProfileScreen() {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [capitalInModalVisible, setCapitalInModalVisible] = useState(false);
+  const [capitalInAmount, setCapitalInAmount] = useState("");
+  const [capitalInDescription, setCapitalInDescription] = useState("");
 
   /**
    * Fetch full profile data from backend
@@ -330,6 +333,99 @@ export default function ProfileScreen() {
   }
 
   /**
+   * Handle capital in
+   */
+  async function handleCapitalIn() {
+    if (!profile) return;
+
+    // Verify biometric first if enabled
+    const verified = await verifyBiometric();
+    if (!verified) {
+      return;
+    }
+
+    setCapitalInAmount("");
+    setCapitalInDescription("");
+    setCapitalInModalVisible(true);
+  }
+
+  /**
+   * Process capital in
+   */
+  async function processCapitalIn() {
+    if (!profile) return;
+
+    // Validate input
+    if (!capitalInAmount || capitalInAmount.trim() === "") {
+      Alert.alert("Error", "Please enter a valid amount");
+      return;
+    }
+
+    const amount = parseFloat(capitalInAmount);
+
+    // Check if amount is a valid number
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert("Error", "Please enter a valid amount greater than 0");
+      return;
+    }
+
+    // Close modal first
+    setCapitalInModalVisible(false);
+
+    // Confirm capital in
+    Alert.alert(
+      "Confirm Capital In",
+      `Are you sure you want to add ${formatCurrency(amount)} to your capital?${
+        capitalInDescription ? `\n\nDescription: ${capitalInDescription}` : ""
+      }`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          style: "default",
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              await apiRequest("/api/admin/ledger", {
+                method: "POST",
+                body: JSON.stringify({
+                  date: new Date().toISOString(),
+                  userId: profile._id,
+                  type: "Capital In",
+                  direction: "In",
+                  amount,
+                  description: capitalInDescription || undefined,
+                  status: "Completed",
+                }),
+              });
+
+              // Refresh profile to get updated balances
+              await fetchProfile();
+
+              Alert.alert(
+                "Success",
+                `Successfully added ${formatCurrency(amount)} to your capital\n\nNew withdrawable cash: ${formatCurrency(
+                  (profile.cashWithdrawable || 0) + amount,
+                )}`,
+              );
+            } catch (error) {
+              Alert.alert(
+                "Capital In Failed",
+                error instanceof Error
+                  ? error.message
+                  : "Failed to add capital",
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  /**
    * Process withdrawal
    */
   async function processWithdrawal() {
@@ -518,6 +614,18 @@ export default function ProfileScreen() {
                 <Text style={styles.ledgerButtonText}>View Ledger</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Capital In Button - Admin Only */}
+            {profile.roleId.role === "Admin" && (
+              <TouchableOpacity
+                style={styles.capitalInButton}
+                onPress={handleCapitalIn}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle-outline" size={20} color="#fff" />
+                <Text style={styles.capitalInButtonText}>Add Capital In</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -796,6 +904,76 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Capital In Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={capitalInModalVisible}
+        onRequestClose={() => setCapitalInModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Capital In</Text>
+              <TouchableOpacity onPress={() => setCapitalInModalVisible(false)}>
+                <Ionicons name="close" size={24} color={ZentyalColors.dark} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Add funds to increase your capital contribution
+            </Text>
+
+            {/* Amount Input */}
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Amount</Text>
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalInput}
+                  value={capitalInAmount}
+                  onChangeText={setCapitalInAmount}
+                  placeholder="0.00"
+                  keyboardType="numeric"
+                  placeholderTextColor={ZentyalColors.gray}
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            {/* Description Input */}
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Description (Optional)</Text>
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalInput}
+                  value={capitalInDescription}
+                  onChangeText={setCapitalInDescription}
+                  placeholder="e.g., Monthly contribution"
+                  placeholderTextColor={ZentyalColors.gray}
+                  multiline
+                  numberOfLines={2}
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setCapitalInModalVisible(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={processCapitalIn}
+              >
+                <Text style={styles.modalConfirmButtonText}>Add Capital</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -1046,6 +1224,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: ZentyalColors.primary,
+  },
+  capitalInButton: {
+    backgroundColor: ZentyalColors.success,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  capitalInButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
   },
   section: {
     marginBottom: 24,

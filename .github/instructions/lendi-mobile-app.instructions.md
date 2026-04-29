@@ -64,6 +64,14 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
 - Profile/Menu screen with settings
 - Withdrawal process (profile page)
   - Biometric verification required before withdrawal (if enabled)
+- Add Capital In feature (profile page)
+  - **Admin Only** - Button only visible for users with Admin role
+  - Endpoint: POST /api/admin/ledger
+  - Allows users to add funds to their capital contribution
+  - Updates: cashWithdrawable, capitalContribution, cashOnHand
+  - Creates UserLedger entry with type CAPITAL_IN
+  - Optional description field
+  - Biometric verification required before adding capital (if enabled)
 - Change Password feature (profile page)
   - Endpoint: POST /api/profile/change-password
   - Requires: oldPassword, newPassword, confirmPassword
@@ -836,6 +844,81 @@ GET    /api/profile                 - Get current user profile
 POST   /api/profile/change-password - Change password
 POST   /api/profile/withdraw        - Withdraw funds from user balance
 GET    /api/profile/userledger      - Get user's ledger transactions (with optional filters)
+
+Admin - Ledger:
+POST   /api/admin/ledger            - Add capital in / Create ledger entry
+```
+
+### Add Capital In API Details
+
+**POST /api/admin/ledger**
+
+Adds funds to the user's capital contribution. This increases both the user's withdrawable cash and capital contribution.
+
+**Request Body:**
+
+```typescript
+{
+  date: string;           // ISO date string (usually new Date().toISOString())
+  userId: string;         // User ID to add capital to
+  type: "Capital In";     // Transaction type
+  direction: "In";        // Transaction direction
+  amount: number;         // Amount to add (must be positive)
+  description?: string;   // Optional description
+  status: "Completed";    // Transaction status
+}
+```
+
+**Response:**
+
+```typescript
+{
+  _id: string;
+  date: string;
+  amount: number;
+  type: "Capital In";
+  direction: "In";
+  cashOnHandUpdated: {
+    previous: number;
+    change: number;
+    current: number;
+  }
+  userUpdated: {
+    userId: string;
+    cashWithdrawableAdded: number;
+    capitalContributionAdded: number;
+    userLedgerCreated: boolean;
+    userLedgerId: string;
+  }
+}
+```
+
+**What it does:**
+
+1. Creates a Ledger entry
+2. Increases Settings.cashOnHand by the amount
+3. Increases User.cashWithdrawable by the amount
+4. Increases User.capitalContribution by the amount
+5. Creates a UserLedger entry with type CAPITAL_IN
+
+**Usage Example:**
+
+```typescript
+await apiRequest("/api/admin/ledger", {
+  method: "POST",
+  body: JSON.stringify({
+    date: new Date().toISOString(),
+    userId: profile._id,
+    type: "Capital In",
+    direction: "In",
+    amount: 5000,
+    description: "Monthly contribution",
+    status: "Completed",
+  }),
+});
+
+// Refresh profile to see updated balances
+await fetchProfile();
 ```
 
 ### Change Password API Details
