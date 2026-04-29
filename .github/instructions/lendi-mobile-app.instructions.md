@@ -108,11 +108,24 @@ LENDI is a mobile frontend for a lending application backend built with NextJS. 
   - Status indicators (ACTIVE/DELETED)
   - Pull-to-refresh functionality
   - Modal-based forms for add/edit
+- Loans management (full CRUD)
+  - **Permission-based access** - Requires "/admin/loan" permissions (Access, Add, Edit, Delete)
+  - Endpoint: GET/POST /api/admin/loan, GET/PUT/DELETE /api/admin/loan/:id
+  - List view with Active/Completed/Cancelled stats
+  - Create new loan with automatic loan number generation
+  - Edit existing loan (only active loans)
+  - Cancel loan with reason required (soft delete)
+  - Fields: clientId (dropdown), principal, interestRate, terms (Weekly/Fortnightly/Monthly), dateStarted, assignedStaff (dropdown)
+  - Status indicators (Active/Completed/Cancelled)
+  - Auto-creates first cycle on loan creation
+  - Dropdown selectors for client and staff assignment
+  - Pull-to-refresh functionality
+  - Modal-based forms with keyboard avoidance
 
 ❌ **Not Yet Implemented:**
 
 - Backend integration (API endpoints not live)
-- Loan/Cycle/Payment management screens
+- Cycle/Payment management screens
 - Role-based navigation (partially implemented)
 
 ### User Roles (Planned)
@@ -1170,6 +1183,7 @@ GET /api/profile/userledger?status=Completed&type=EARNING
 Fetches all clients from the system. Requires "Access" permission for "/admin/client".
 
 **Query Parameters (all optional):**
+
 - `status`: Filter by status (not commonly used, but available)
 - `email`: Search by email (regex, case-insensitive)
 - `firstName`: Search by first name (regex, case-insensitive)
@@ -1178,6 +1192,7 @@ Fetches all clients from the system. Requires "Access" permission for "/admin/cl
 - `address`: Search by address (regex, case-insensitive)
 
 **Response:**
+
 ```typescript
 Client[] = [
   {
@@ -1220,6 +1235,7 @@ Client[] = [
 Creates a new client. Requires "Add" permission for "/admin/client".
 
 **Request Body:**
+
 ```typescript
 {
   firstName: string;      // Required
@@ -1252,15 +1268,17 @@ Updates an existing client. Requires "Edit" permission for "/admin/client".
 Soft deletes a client (sets status to DELETED). Requires "Delete" permission for "/admin/client".
 
 **Request Body:**
+
 ```typescript
 {
-  reason: string;  // Required - reason for deletion
+  reason: string; // Required - reason for deletion
 }
 ```
 
 **Response:** Returns the deleted client with deletedAt, deletedBy, and deletedReason populated.
 
 **Usage Examples:**
+
 ```typescript
 // Get all clients
 const clients = await apiRequest<Client[]>("/api/admin/client");
@@ -1291,6 +1309,163 @@ await apiRequest(`/api/admin/client/${clientId}`, {
   method: "DELETE",
   body: JSON.stringify({
     reason: "Duplicate entry",
+  }),
+});
+```
+
+### Loans API Details
+
+**GET /api/admin/loan**
+
+Fetches all loans from the system. Requires "Access" permission for "/admin/loan".
+
+**Query Parameters (all optional):**
+
+- `status`: Filter by status (Active, Completed, Cancelled)
+- `clientId`: Filter by client ID
+- `assignedStaff`: Filter by assigned staff ID
+- `terms`: Filter by terms (Weekly, Fortnightly, Monthly)
+
+**Response:**
+
+```typescript
+Loan[] = [
+  {
+    _id: string;
+    loanNo: string; // Auto-generated (e.g., "LN-202604-0001")
+    clientId: {
+      _id: string;
+      firstName: string;
+      middleName?: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      address: string;
+    };
+    principal: number;
+    interestRate: number;
+    terms: "Weekly" | "Fortnightly" | "Monthly";
+    dateStarted: string;
+    assignedStaff: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    status: "Active" | "Completed" | "Cancelled";
+    createdAt: string;
+    updatedAt: string;
+    createdBy?: { _id, firstName, lastName, email };
+    updatedBy?: { _id, firstName, lastName, email };
+    deletedAt?: string;
+    deletedBy?: { _id, firstName, lastName, email };
+    deletedReason?: string;
+  }
+]
+```
+
+**POST /api/admin/loan**
+
+Creates a new loan with auto-generated loan number. Requires "Add" permission for "/admin/loan". Also validates cash on hand and auto-creates first cycle.
+
+**Request Body:**
+
+```typescript
+{
+  clientId: string; // Required - Client ObjectId
+  principal: number; // Required - Must be positive
+  interestRate: number; // Required - Must be positive or zero
+  terms: "Weekly" | "Fortnightly" | "Monthly"; // Required
+  dateStarted: string; // Required - ISO date string
+  assignedStaff: string; // Required - Staff ObjectId
+}
+```
+
+**Response:** Returns the created loan with populated fields.
+
+**Important:** Loan creation performs these operations in a transaction:
+
+1. Validates cash on hand (principal must not exceed available cash)
+2. Generates unique loan number (format: LN-YYYYMM-####)
+3. Creates loan record
+4. Auto-creates first cycle with calculated interest and due date
+5. Creates ledger entry for loan release
+
+**GET /api/admin/loan/:id**
+
+Fetches a single loan by ID. Requires "Access" permission for "/admin/loan".
+
+**Response:** Returns the loan object with populated fields.
+
+**PUT /api/admin/loan/:id**
+
+Updates an existing loan. Requires "Edit" permission for "/admin/loan".
+
+**Request Body:** Same as POST (all fields optional, only provided fields are updated). loanNo cannot be updated.
+
+**Important:**
+
+- Cannot edit cancelled loans
+- Numeric values must be positive if provided
+
+**Response:** Returns the updated loan with populated fields.
+
+**DELETE /api/admin/loan/:id**
+
+Cancels a loan (soft delete, sets status to Cancelled). Requires "Delete" permission for "/admin/loan".
+
+**Request Body:**
+
+```typescript
+{
+  reason: string; // Required - reason for cancellation
+}
+```
+
+**Important:**
+
+- Only active loans can be cancelled
+- Cannot cancel already cancelled loans
+- Validates that loan has no active cycles before cancellation
+
+**Response:** Returns the cancelled loan with deletedAt, deletedBy, and deletedReason populated.
+
+**Usage Examples:**
+
+```typescript
+// Get all loans
+const loans = await apiRequest<Loan[]>("/api/admin/loan");
+
+// Get active loans only
+const activeLoans = await apiRequest<Loan[]>("/api/admin/loan?status=Active");
+
+// Create new loan
+const newLoan = await apiRequest("/api/admin/loan", {
+  method: "POST",
+  body: JSON.stringify({
+    clientId: "60d5ec49f1b2c8b1f8e4e5a1",
+    principal: 50000,
+    interestRate: 10,
+    terms: "Weekly",
+    dateStarted: "2026-04-30",
+    assignedStaff: "60d5ec49f1b2c8b1f8e4e5a2",
+  }),
+});
+
+// Update loan
+await apiRequest(`/api/admin/loan/${loanId}`, {
+  method: "PUT",
+  body: JSON.stringify({
+    principal: 55000,
+    interestRate: 12,
+  }),
+});
+
+// Cancel loan
+await apiRequest(`/api/admin/loan/${loanId}`, {
+  method: "DELETE",
+  body: JSON.stringify({
+    reason: "Client requested cancellation",
   }),
 });
 ```

@@ -42,7 +42,10 @@ export default function ManageScreen() {
             if (hasPermission("/admin/client", "Access")) {
               router.push("/clients" as any);
             } else {
-              Alert.alert("Access Denied", "You don't have permission to access this page");
+              Alert.alert(
+                "Access Denied",
+                "You don't have permission to access this page",
+              );
             }
           }}
           color={ZentyalColors.primary}
@@ -52,7 +55,16 @@ export default function ManageScreen() {
           icon="cash"
           label="Loans"
           description="Manage loan applications"
-          onPress={() => Alert.alert("Loans", "Coming soon")}
+          onPress={() => {
+            if (hasPermission("/admin/loan", "Access")) {
+              router.push("/loans" as any);
+            } else {
+              Alert.alert(
+                "Access Denied",
+                "You don't have permission to access this page",
+              );
+            }
+          }}
           color={ZentyalColors.success}
         />
 

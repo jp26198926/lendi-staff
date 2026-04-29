@@ -1,39 +1,55 @@
 /**
- * Clients Screen
- * List and manage clients with CRUD operations
+ * Loans Screen
+ * List and manage loans with CRUD operations
  */
 
 import { ZentyalColors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/utils/apiClient";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { Picker } from "@react-native-picker/picker";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
-// Client interface
-interface Client {
+// Loan interface
+interface Loan {
   _id: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  phone: string;
-  email: string;
-  address: string;
-  status: "ACTIVE" | "DELETED";
+  loanNo: string;
+  clientId: {
+    _id: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    address: string;
+  };
+  principal: number;
+  interestRate: number;
+  terms: "Weekly" | "Fortnightly" | "Monthly";
+  dateStarted: string;
+  assignedStaff: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  status: "Active" | "Completed" | "Cancelled";
   createdAt: string;
   updatedAt: string;
   createdBy?: {
@@ -58,26 +74,48 @@ interface Client {
   deletedReason?: string;
 }
 
-export default function ClientsScreen() {
+interface Client {
+  _id: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  status: string;
+}
+
+interface Staff {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: string;
+}
+
+export default function LoansScreen() {
   const { user, hasPermission } = useAuth();
+  const [loans, setLoans] = useState<Loan[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [staffs, setStaffs] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [deletingClient, setDeletingClient] = useState<Client | null>(null);
+  const [deletingLoan, setDeletingLoan] = useState<Loan | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
 
   // Form state
-  const [firstName, setFirstName] = useState("");
-  const [middleName, setMiddleName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [principal, setPrincipal] = useState("");
+  const [interestRate, setInterestRate] = useState("");
+  const [terms, setTerms] = useState<"Weekly" | "Fortnightly" | "Monthly">(
+    "Weekly",
+  );
+  const [dateStarted, setDateStarted] = useState("");
+  const [assignedStaff, setAssignedStaff] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const PAGE_PATH = "/admin/client";
+  const PAGE_PATH = "/admin/loan";
 
   /**
    * Check permissions
@@ -95,23 +133,62 @@ export default function ClientsScreen() {
       );
       return;
     }
-    fetchClients();
+    fetchData();
   }, [user]);
 
   /**
-   * Fetch clients from backend
+   * Fetch all data (loans, clients, staffs)
    */
-  async function fetchClients() {
+  async function fetchData() {
     try {
-      const response = await apiRequest<Client[]>("/api/admin/client");
-      setClients(response);
+      await Promise.all([fetchLoans(), fetchClients(), fetchStaffs()]);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Fetch loans from backend
+   */
+  async function fetchLoans() {
+    try {
+      const response = await apiRequest<Loan[]>("/api/admin/loan");
+      setLoans(response);
     } catch (error) {
       Alert.alert(
         "Error",
-        error instanceof Error ? error.message : "Failed to load clients",
+        error instanceof Error ? error.message : "Failed to load loans",
       );
-    } finally {
-      setLoading(false);
+    }
+  }
+
+  /**
+   * Fetch clients for dropdown
+   */
+  async function fetchClients() {
+    try {
+      const response = await apiRequest<Client[]>(
+        "/api/admin/client?status=ACTIVE",
+      );
+      setClients(response);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+    }
+  }
+
+  /**
+   * Fetch staff members for dropdown
+   */
+  async function fetchStaffs() {
+    try {
+      const response = await apiRequest<Staff[]>(
+        "/api/admin/user?status=ACTIVE",
+      );
+      setStaffs(response);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
     }
   }
 
@@ -120,7 +197,7 @@ export default function ClientsScreen() {
    */
   async function handleRefresh() {
     setRefreshing(true);
-    await fetchClients();
+    await fetchData();
     setRefreshing(false);
   }
 
@@ -129,53 +206,59 @@ export default function ClientsScreen() {
    */
   function handleAdd() {
     if (!hasPermission(PAGE_PATH, "Add")) {
-      Alert.alert(
-        "Access Denied",
-        "You don't have permission to create clients",
-      );
+      Alert.alert("Access Denied", "You don't have permission to create loans");
       return;
     }
-    setEditingClient(null);
-    setFirstName("");
-    setMiddleName("");
-    setLastName("");
-    setPhone("");
-    setEmail("");
-    setAddress("");
+    setEditingLoan(null);
+    setClientId("");
+    setPrincipal("");
+    setInterestRate("");
+    setTerms("Weekly");
+    setDateStarted(new Date().toISOString().split("T")[0]);
+    setAssignedStaff("");
     setModalVisible(true);
   }
 
   /**
    * Open edit modal
    */
-  function handleEdit(client: Client) {
+  function handleEdit(loan: Loan) {
     if (!hasPermission(PAGE_PATH, "Edit")) {
-      Alert.alert("Access Denied", "You don't have permission to edit clients");
+      Alert.alert("Access Denied", "You don't have permission to edit loans");
       return;
     }
-    setEditingClient(client);
-    setFirstName(client.firstName);
-    setMiddleName(client.middleName || "");
-    setLastName(client.lastName);
-    setPhone(client.phone);
-    setEmail(client.email);
-    setAddress(client.address);
+    if (loan.status === "Cancelled") {
+      Alert.alert("Cannot Edit", "Cancelled loans cannot be edited");
+      return;
+    }
+    setEditingLoan(loan);
+    setClientId(loan.clientId._id);
+    setPrincipal(loan.principal.toString());
+    setInterestRate(loan.interestRate.toString());
+    setTerms(loan.terms);
+    setDateStarted(new Date(loan.dateStarted).toISOString().split("T")[0]);
+    setAssignedStaff(loan.assignedStaff._id);
     setModalVisible(true);
   }
 
   /**
    * Handle delete
    */
-  function handleDelete(client: Client) {
+  function handleDelete(loan: Loan) {
     if (!hasPermission(PAGE_PATH, "Delete")) {
-      Alert.alert(
-        "Access Denied",
-        "You don't have permission to delete clients",
-      );
+      Alert.alert("Access Denied", "You don't have permission to cancel loans");
+      return;
+    }
+    if (loan.status === "Cancelled") {
+      Alert.alert("Already Cancelled", "This loan is already cancelled");
+      return;
+    }
+    if (loan.status !== "Active") {
+      Alert.alert("Cannot Cancel", "Only active loans can be cancelled");
       return;
     }
 
-    setDeletingClient(client);
+    setDeletingLoan(loan);
     setDeleteReason("");
     setDeleteModalVisible(true);
   }
@@ -184,10 +267,10 @@ export default function ClientsScreen() {
    * Process delete
    */
   async function processDelete() {
-    if (!deletingClient) return;
+    if (!deletingLoan) return;
 
     if (!deleteReason.trim()) {
-      Alert.alert("Error", "Deletion reason is required");
+      Alert.alert("Error", "Cancellation reason is required");
       return;
     }
 
@@ -195,19 +278,19 @@ export default function ClientsScreen() {
       setLoading(true);
       setDeleteModalVisible(false);
 
-      await apiRequest(`/api/admin/client/${deletingClient._id}`, {
+      await apiRequest(`/api/admin/loan/${deletingLoan._id}`, {
         method: "DELETE",
         body: JSON.stringify({ reason: deleteReason }),
       });
 
-      Alert.alert("Success", "Client deleted successfully");
-      setDeletingClient(null);
+      Alert.alert("Success", "Loan cancelled successfully");
+      setDeletingLoan(null);
       setDeleteReason("");
-      await fetchClients();
+      await fetchLoans();
     } catch (error) {
       Alert.alert(
-        "Delete Failed",
-        error instanceof Error ? error.message : "Failed to delete client",
+        "Cancel Failed",
+        error instanceof Error ? error.message : "Failed to cancel loan",
       );
     } finally {
       setLoading(false);
@@ -215,18 +298,31 @@ export default function ClientsScreen() {
   }
 
   /**
-   * Save client (create or update)
+   * Save loan (create or update)
    */
   async function handleSave() {
     // Validate
     if (
-      !firstName.trim() ||
-      !lastName.trim() ||
-      !phone.trim() ||
-      !email.trim() ||
-      !address.trim()
+      !clientId ||
+      !principal.trim() ||
+      !interestRate.trim() ||
+      !dateStarted ||
+      !assignedStaff
     ) {
       Alert.alert("Validation Error", "Please fill in all required fields");
+      return;
+    }
+
+    const principalNum = parseFloat(principal);
+    const interestRateNum = parseFloat(interestRate);
+
+    if (isNaN(principalNum) || principalNum <= 0) {
+      Alert.alert("Validation Error", "Please enter a valid principal amount");
+      return;
+    }
+
+    if (isNaN(interestRateNum) || interestRateNum < 0) {
+      Alert.alert("Validation Error", "Please enter a valid interest rate");
       return;
     }
 
@@ -234,36 +330,36 @@ export default function ClientsScreen() {
       setLoading(true);
       setModalVisible(false);
 
-      const clientData = {
-        firstName: firstName.trim(),
-        middleName: middleName.trim() || undefined,
-        lastName: lastName.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        address: address.trim(),
+      const loanData = {
+        clientId,
+        principal: principalNum,
+        interestRate: interestRateNum,
+        terms,
+        dateStarted,
+        assignedStaff,
       };
 
-      if (editingClient) {
+      if (editingLoan) {
         // Update
-        await apiRequest(`/api/admin/client/${editingClient._id}`, {
+        await apiRequest(`/api/admin/loan/${editingLoan._id}`, {
           method: "PUT",
-          body: JSON.stringify(clientData),
+          body: JSON.stringify(loanData),
         });
-        Alert.alert("Success", "Client updated successfully");
+        Alert.alert("Success", "Loan updated successfully");
       } else {
         // Create
-        await apiRequest("/api/admin/client", {
+        await apiRequest("/api/admin/loan", {
           method: "POST",
-          body: JSON.stringify(clientData),
+          body: JSON.stringify(loanData),
         });
-        Alert.alert("Success", "Client created successfully");
+        Alert.alert("Success", "Loan created successfully");
       }
 
-      await fetchClients();
+      await fetchLoans();
     } catch (error) {
       Alert.alert(
         "Save Failed",
-        error instanceof Error ? error.message : "Failed to save client",
+        error instanceof Error ? error.message : "Failed to save loan",
       );
     } finally {
       setLoading(false);
@@ -282,11 +378,21 @@ export default function ClientsScreen() {
     });
   }
 
-  if (loading && clients.length === 0) {
+  /**
+   * Format currency
+   */
+  function formatCurrency(value: number): string {
+    return value.toLocaleString("en-PH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  if (loading && loans.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={ZentyalColors.primary} />
-        <Text style={styles.loadingText}>Loading clients...</Text>
+        <Text style={styles.loadingText}>Loading loans...</Text>
       </View>
     );
   }
@@ -301,7 +407,7 @@ export default function ClientsScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={ZentyalColors.dark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Clients</Text>
+        <Text style={styles.headerTitle}>Loans</Text>
         {hasPermission(PAGE_PATH, "Add") && (
           <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
             <Ionicons name="add" size={24} color="#fff" />
@@ -325,134 +431,128 @@ export default function ClientsScreen() {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
-              {clients.filter((c) => c.status === "ACTIVE").length}
+              {loans.filter((l) => l.status === "Active").length}
             </Text>
             <Text style={styles.statLabel}>Active</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
-              {clients.filter((c) => c.status === "DELETED").length}
+              {loans.filter((l) => l.status === "Completed").length}
             </Text>
-            <Text style={styles.statLabel}>Deleted</Text>
+            <Text style={styles.statLabel}>Completed</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{clients.length}</Text>
-            <Text style={styles.statLabel}>Total</Text>
+            <Text style={styles.statValue}>
+              {loans.filter((l) => l.status === "Cancelled").length}
+            </Text>
+            <Text style={styles.statLabel}>Cancelled</Text>
           </View>
         </View>
 
-        {/* Client List */}
+        {/* Loan List */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            All Clients ({clients.length})
-          </Text>
+          <Text style={styles.sectionTitle}>All Loans ({loans.length})</Text>
 
-          {clients.length === 0 ? (
+          {loans.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons
-                name="people-outline"
+                name="cash-outline"
                 size={64}
                 color={ZentyalColors.gray}
               />
-              <Text style={styles.emptyText}>No clients found</Text>
+              <Text style={styles.emptyText}>No loans found</Text>
               {hasPermission(PAGE_PATH, "Add") && (
                 <TouchableOpacity
                   style={styles.emptyButton}
                   onPress={handleAdd}
                 >
-                  <Text style={styles.emptyButtonText}>Add First Client</Text>
+                  <Text style={styles.emptyButtonText}>Add First Loan</Text>
                 </TouchableOpacity>
               )}
             </View>
           ) : (
-            clients.map((client) => (
-              <View key={client._id} style={styles.clientCard}>
-                <View style={styles.clientHeader}>
-                  <View style={styles.clientAvatar}>
-                    <Text style={styles.clientAvatarText}>
-                      {client.firstName[0]}
-                      {client.lastName[0]}
+            loans.map((loan) => (
+              <View key={loan._id} style={styles.loanCard}>
+                <View style={styles.loanHeader}>
+                  <View>
+                    <Text style={styles.loanNo}>{loan.loanNo}</Text>
+                    <Text style={styles.clientName}>
+                      {loan.clientId.firstName}{" "}
+                      {loan.clientId.middleName
+                        ? loan.clientId.middleName + " "
+                        : ""}
+                      {loan.clientId.lastName}
                     </Text>
                   </View>
-                  <View style={styles.clientInfo}>
-                    <Text style={styles.clientName}>
-                      {client.firstName}{" "}
-                      {client.middleName ? client.middleName + " " : ""}
-                      {client.lastName}
-                    </Text>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        {
-                          backgroundColor:
-                            client.status === "ACTIVE"
-                              ? ZentyalColors.success + "20"
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor:
+                          loan.status === "Active"
+                            ? ZentyalColors.success + "20"
+                            : loan.status === "Completed"
+                              ? ZentyalColors.info + "20"
                               : ZentyalColors.gray + "20",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        {
+                          color:
+                            loan.status === "Active"
+                              ? ZentyalColors.success
+                              : loan.status === "Completed"
+                                ? ZentyalColors.info
+                                : ZentyalColors.gray,
                         },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          {
-                            color:
-                              client.status === "ACTIVE"
-                                ? ZentyalColors.success
-                                : ZentyalColors.gray,
-                          },
-                        ]}
-                      >
-                        {client.status}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.clientDetails}>
-                  <View style={styles.clientDetail}>
-                    <Ionicons
-                      name="mail-outline"
-                      size={14}
-                      color={ZentyalColors.gray}
-                    />
-                    <Text style={styles.clientDetailText}>{client.email}</Text>
-                  </View>
-                  <View style={styles.clientDetail}>
-                    <Ionicons
-                      name="call-outline"
-                      size={14}
-                      color={ZentyalColors.gray}
-                    />
-                    <Text style={styles.clientDetailText}>{client.phone}</Text>
-                  </View>
-                  <View style={styles.clientDetail}>
-                    <Ionicons
-                      name="location-outline"
-                      size={14}
-                      color={ZentyalColors.gray}
-                    />
-                    <Text style={styles.clientDetailText}>
-                      {client.address}
-                    </Text>
-                  </View>
-                  <View style={styles.clientDetail}>
-                    <Ionicons
-                      name="calendar-outline"
-                      size={14}
-                      color={ZentyalColors.gray}
-                    />
-                    <Text style={styles.clientDetailText}>
-                      Created: {formatDate(client.createdAt)}
+                      {loan.status}
                     </Text>
                   </View>
                 </View>
 
-                {client.status === "ACTIVE" && (
-                  <View style={styles.clientActions}>
+                <View style={styles.loanDetails}>
+                  <View style={styles.loanDetailRow}>
+                    <Text style={styles.loanDetailLabel}>Principal:</Text>
+                    <Text style={styles.loanDetailValue}>
+                      {formatCurrency(loan.principal)}
+                    </Text>
+                  </View>
+                  <View style={styles.loanDetailRow}>
+                    <Text style={styles.loanDetailLabel}>Interest Rate:</Text>
+                    <Text style={styles.loanDetailValue}>
+                      {loan.interestRate}%
+                    </Text>
+                  </View>
+                  <View style={styles.loanDetailRow}>
+                    <Text style={styles.loanDetailLabel}>Terms:</Text>
+                    <Text style={styles.loanDetailValue}>{loan.terms}</Text>
+                  </View>
+                  <View style={styles.loanDetailRow}>
+                    <Text style={styles.loanDetailLabel}>Date Started:</Text>
+                    <Text style={styles.loanDetailValue}>
+                      {formatDate(loan.dateStarted)}
+                    </Text>
+                  </View>
+                  <View style={styles.loanDetailRow}>
+                    <Text style={styles.loanDetailLabel}>Assigned Staff:</Text>
+                    <Text style={styles.loanDetailValue}>
+                      {loan.assignedStaff.firstName}{" "}
+                      {loan.assignedStaff.lastName}
+                    </Text>
+                  </View>
+                </View>
+
+                {loan.status === "Active" && (
+                  <View style={styles.loanActions}>
                     {hasPermission(PAGE_PATH, "Edit") && (
                       <TouchableOpacity
                         style={[styles.actionButton, styles.editButton]}
-                        onPress={() => handleEdit(client)}
+                        onPress={() => handleEdit(loan)}
                       >
                         <Ionicons
                           name="create-outline"
@@ -465,14 +565,14 @@ export default function ClientsScreen() {
                     {hasPermission(PAGE_PATH, "Delete") && (
                       <TouchableOpacity
                         style={[styles.actionButton, styles.deleteButton]}
-                        onPress={() => handleDelete(client)}
+                        onPress={() => handleDelete(loan)}
                       >
                         <Ionicons
-                          name="trash-outline"
+                          name="close-circle-outline"
                           size={18}
                           color={ZentyalColors.danger}
                         />
-                        <Text style={styles.deleteButtonText}>Delete</Text>
+                        <Text style={styles.deleteButtonText}>Cancel</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -507,7 +607,7 @@ export default function ClientsScreen() {
               <View style={styles.formModalContainer}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>
-                    {editingClient ? "Edit Client" : "Add Client"}
+                    {editingLoan ? "Edit Loan" : "Add Loan"}
                   </Text>
                   <TouchableOpacity onPress={() => setModalVisible(false)}>
                     <Ionicons
@@ -520,74 +620,114 @@ export default function ClientsScreen() {
 
                 <ScrollView style={styles.modalContent}>
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>First Name *</Text>
+                    <Text style={styles.formLabel}>Client *</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker
+                        selectedValue={clientId}
+                        onValueChange={(value) => setClientId(value)}
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="Select a client" value="" />
+                        {clients.map((client) => (
+                          <Picker.Item
+                            key={client._id}
+                            label={`${client.firstName} ${client.middleName ? client.middleName + " " : ""}${client.lastName}`}
+                            value={client._id}
+                          />
+                        ))}
+                      </Picker>
+                    </View>
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Principal Amount *</Text>
                     <TextInput
                       style={styles.formInput}
-                      value={firstName}
-                      onChangeText={setFirstName}
-                      placeholder="Enter first name"
+                      value={principal}
+                      onChangeText={setPrincipal}
+                      placeholder="Enter principal amount"
                       placeholderTextColor={ZentyalColors.gray}
+                      keyboardType="numeric"
                     />
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Middle Name</Text>
+                    <Text style={styles.formLabel}>Interest Rate (%) *</Text>
                     <TextInput
                       style={styles.formInput}
-                      value={middleName}
-                      onChangeText={setMiddleName}
-                      placeholder="Enter middle name (optional)"
+                      value={interestRate}
+                      onChangeText={setInterestRate}
+                      placeholder="Enter interest rate"
                       placeholderTextColor={ZentyalColors.gray}
+                      keyboardType="numeric"
                     />
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Last Name *</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={lastName}
-                      onChangeText={setLastName}
-                      placeholder="Enter last name"
-                      placeholderTextColor={ZentyalColors.gray}
-                    />
+                    <Text style={styles.formLabel}>Terms *</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker
+                        selectedValue={terms}
+                        onValueChange={(value) => setTerms(value as any)}
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="Weekly" value="Weekly" />
+                        <Picker.Item label="Fortnightly" value="Fortnightly" />
+                        <Picker.Item label="Monthly" value="Monthly" />
+                      </Picker>
+                    </View>
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Email *</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={email}
-                      onChangeText={setEmail}
-                      placeholder="Enter email address"
-                      placeholderTextColor={ZentyalColors.gray}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
+                    <Text style={styles.formLabel}>Date Started *</Text>
+                    <TouchableOpacity
+                      style={styles.datePickerButton}
+                      onPress={() => setShowDatePicker(true)}
+                    >
+                      <Text style={styles.datePickerText}>
+                        {dateStarted ? formatDate(dateStarted) : "Select date"}
+                      </Text>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={20}
+                        color={ZentyalColors.gray}
+                      />
+                    </TouchableOpacity>
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={dateStarted ? new Date(dateStarted) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event, selectedDate) => {
+                          setShowDatePicker(Platform.OS === "ios");
+                          if (selectedDate) {
+                            setDateStarted(
+                              selectedDate.toISOString().split("T")[0],
+                            );
+                          }
+                        }}
+                      />
+                    )}
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Phone *</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={phone}
-                      onChangeText={setPhone}
-                      placeholder="Enter phone number"
-                      placeholderTextColor={ZentyalColors.gray}
-                      keyboardType="phone-pad"
-                    />
-                  </View>
-
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Address *</Text>
-                    <TextInput
-                      style={[styles.formInput, styles.textArea]}
-                      value={address}
-                      onChangeText={setAddress}
-                      placeholder="Enter address"
-                      placeholderTextColor={ZentyalColors.gray}
-                      multiline
-                      numberOfLines={3}
-                    />
+                    <Text style={styles.formLabel}>Assigned Staff *</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker
+                        selectedValue={assignedStaff}
+                        onValueChange={(value) => setAssignedStaff(value)}
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="Select a staff member" value="" />
+                        {staffs.map((staff) => (
+                          <Picker.Item
+                            key={staff._id}
+                            label={`${staff.firstName} ${staff.lastName}`}
+                            value={staff._id}
+                          />
+                        ))}
+                      </Picker>
+                    </View>
                   </View>
                 </ScrollView>
 
@@ -603,7 +743,7 @@ export default function ClientsScreen() {
                     onPress={handleSave}
                   >
                     <Text style={styles.modalSaveButtonText}>
-                      {editingClient ? "Update" : "Create"}
+                      {editingLoan ? "Update" : "Create"}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -636,7 +776,7 @@ export default function ClientsScreen() {
             >
               <View style={styles.deleteModalContainer}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Delete Client</Text>
+                  <Text style={styles.modalTitle}>Cancel Loan</Text>
                   <TouchableOpacity
                     onPress={() => setDeleteModalVisible(false)}
                   >
@@ -656,22 +796,23 @@ export default function ClientsScreen() {
                       color={ZentyalColors.danger}
                     />
                     <Text style={styles.deleteWarningTitle}>
-                      Delete {deletingClient?.firstName}{" "}
-                      {deletingClient?.lastName}?
+                      Cancel Loan {deletingLoan?.loanNo}?
                     </Text>
                     <Text style={styles.deleteWarningText}>
-                      This action cannot be undone. The client will be marked as
-                      deleted.
+                      This action cannot be undone. The loan will be marked as
+                      cancelled.
                     </Text>
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Reason for Deletion *</Text>
+                    <Text style={styles.formLabel}>
+                      Reason for Cancellation *
+                    </Text>
                     <TextInput
                       style={[styles.formInput, styles.textArea]}
                       value={deleteReason}
                       onChangeText={setDeleteReason}
-                      placeholder="Enter reason for deletion"
+                      placeholder="Enter reason for cancellation"
                       placeholderTextColor={ZentyalColors.gray}
                       multiline
                       numberOfLines={3}
@@ -690,7 +831,9 @@ export default function ClientsScreen() {
                     style={[styles.modalButton, styles.modalDeleteButton]}
                     onPress={processDelete}
                   >
-                    <Text style={styles.modalDeleteButtonText}>Delete</Text>
+                    <Text style={styles.modalDeleteButtonText}>
+                      Cancel Loan
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -816,7 +959,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#fff",
   },
-  clientCard: {
+  loanCard: {
     backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
@@ -827,59 +970,54 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  clientHeader: {
+  loanHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: ZentyalColors.gray + "20",
   },
-  clientAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: ZentyalColors.primary + "20",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  clientAvatarText: {
-    fontSize: 18,
+  loanNo: {
+    fontSize: 16,
     fontWeight: "bold",
     color: ZentyalColors.primary,
-  },
-  clientInfo: {
-    flex: 1,
-  },
-  clientName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: ZentyalColors.dark,
     marginBottom: 4,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-  },
-  statusText: {
-    fontSize: 10,
+  clientName: {
+    fontSize: 14,
+    color: ZentyalColors.dark,
     fontWeight: "600",
   },
-  clientDetails: {
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  loanDetails: {
     gap: 8,
     marginBottom: 12,
   },
-  clientDetail: {
+  loanDetailRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: 6,
   },
-  clientDetailText: {
+  loanDetailLabel: {
     fontSize: 13,
     color: ZentyalColors.gray,
-    flex: 1,
   },
-  clientActions: {
+  loanDetailValue: {
+    fontSize: 13,
+    color: ZentyalColors.dark,
+    fontWeight: "600",
+  },
+  loanActions: {
     flexDirection: "row",
     gap: 8,
     paddingTop: 12,
@@ -930,12 +1068,6 @@ const styles = StyleSheet.create({
   formModalWrapper: {
     width: "100%",
     maxWidth: 600,
-  },
-  modalContainer: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "90%",
   },
   formModalContainer: {
     backgroundColor: "#fff",
@@ -996,6 +1128,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: ZentyalColors.dark,
     backgroundColor: ZentyalColors.light,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: ZentyalColors.gray + "40",
+    borderRadius: 12,
+    backgroundColor: ZentyalColors.light,
+    overflow: "hidden",
+  },
+  picker: {
+    height: 50,
+    color: ZentyalColors.dark,
+  },
+  datePickerButton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: ZentyalColors.gray + "40",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: ZentyalColors.light,
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: ZentyalColors.dark,
   },
   textArea: {
     minHeight: 80,
