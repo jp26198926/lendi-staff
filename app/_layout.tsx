@@ -45,12 +45,33 @@ export default function RootLayout() {
             },
           }}
         >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
+          {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
           <Stack.Screen
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}
+          />
+
+          <Stack.Screen
+            name="clients"
+            options={{ title: "Manage", headerShown: false }}
+          />
+
+          <Stack.Screen
+            name="ledger"
+            options={{ title: "User Ledger", headerShown: false }}
+          />
+
+          <Stack.Screen
+            name="loans"
+            options={{ title: "Loans", headerShown: false }}
+          />
+
+          <Stack.Screen
+            name="transactions"
+            options={{ title: "Transactions", headerShown: false }}
           />
         </Stack>
         <StatusBar style="light" backgroundColor={ZentyalColors.primary} />

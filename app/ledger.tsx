@@ -6,7 +6,8 @@
 import { ZentyalColors } from "@/constants/theme";
 import { apiRequest } from "@/utils/apiClient";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { router } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +15,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -65,6 +67,7 @@ export default function LedgerScreen() {
   const [ledgers, setLedgers] = useState<UserLedger[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [filter, setFilter] = useState<{
     status?: string;
     type?: string;
@@ -73,7 +76,7 @@ export default function LedgerScreen() {
   /**
    * Fetch user ledger records
    */
-  async function fetchLedgers() {
+  const fetchLedgers = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (filter.status) params.append("status", filter.status);
@@ -94,7 +97,7 @@ export default function LedgerScreen() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filter]);
 
   /**
    * Handle pull-to-refresh
@@ -107,7 +110,7 @@ export default function LedgerScreen() {
 
   useEffect(() => {
     fetchLedgers();
-  }, [filter]);
+  }, [fetchLedgers]);
 
   /**
    * Format currency for display
@@ -223,12 +226,12 @@ export default function LedgerScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        {/* <TouchableOpacity
+        <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color={ZentyalColors.dark} />
-        </TouchableOpacity> */}
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Ledger History</Text>
         <View style={styles.headerRight} />
       </View>

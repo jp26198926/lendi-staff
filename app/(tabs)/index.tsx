@@ -201,7 +201,7 @@ export default function DashboardScreen() {
       )}
 
       {/* Quick Actions */}
-      <View style={styles.section}>
+      {/* <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionsGrid}>
           <ActionButton icon="person-add" label="New Client" />
@@ -209,7 +209,7 @@ export default function DashboardScreen() {
           <ActionButton icon="card" label="Record Payment" />
           <ActionButton icon="document-text" label="Reports" />
         </View>
-      </View>
+      </View> */}
     </ScrollView>
   );
 }

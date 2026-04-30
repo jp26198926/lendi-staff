@@ -25,12 +25,12 @@ export default function ManageScreen() {
       contentContainerStyle={styles.contentContainer}
     >
       {/* Header */}
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <Text style={styles.headerTitle}>Manage</Text>
         <Text style={styles.headerSubtitle}>
           Manage clients, loans, cycles, and payments
         </Text>
-      </View>
+      </View> */}
 
       {/* Management Menu */}
       <View style={styles.section}>

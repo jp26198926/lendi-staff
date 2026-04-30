@@ -57,7 +57,7 @@ export default function TabLayout() {
       />
 
       {/* Loans Tab */}
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="loans"
         options={{
           title: "Loans",
@@ -70,10 +70,10 @@ export default function TabLayout() {
           ),
           href: null, // Hide for now until implemented
         }}
-      />
+      /> */}
 
       {/* Clients Tab (Admin/Users only) */}
-      {!isClient && hasPermission("/admin/client", "Access") && (
+      {/* {!isClient && hasPermission("/admin/client", "Access") && (
         <Tabs.Screen
           name="clients"
           options={{
@@ -88,7 +88,7 @@ export default function TabLayout() {
             href: null, // Hide for now until implemented
           }}
         />
-      )}
+      )} */}
 
       {/* Manage Tab */}
       <Tabs.Screen
