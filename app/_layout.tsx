@@ -73,6 +73,11 @@ export default function RootLayout() {
             name="transactions"
             options={{ title: "Transactions", headerShown: false }}
           />
+
+          <Stack.Screen
+            name="cycles"
+            options={{ title: "Loan Cycles", headerShown: false }}
+          />
         </Stack>
         <StatusBar style="light" backgroundColor={ZentyalColors.primary} />
       </ThemeProvider>

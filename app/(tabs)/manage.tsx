@@ -72,7 +72,16 @@ export default function ManageScreen() {
           icon="repeat"
           label="Cycles"
           description="Manage payment cycles"
-          onPress={() => Alert.alert("Cycles", "Coming soon")}
+          onPress={() => {
+            if (hasPermission("/admin/cycle", "Access")) {
+              router.push("/cycles" as any);
+            } else {
+              Alert.alert(
+                "Access Denied",
+                "You don't have permission to access this page",
+              );
+            }
+          }}
           color={ZentyalColors.info}
         />
 
