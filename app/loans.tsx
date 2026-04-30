@@ -329,8 +329,6 @@ export default function LoansScreen() {
         console.warn("⚠️ Invalid cycles response:", response);
         setCycles([]);
       } else {
-        console.log(`✅ Setting ${response.length} cycles to state`);
-        console.log("✅ Cycles data:", JSON.stringify(response, null, 2));
         setCycles(response);
       }
     } catch (error) {
@@ -1363,12 +1361,6 @@ export default function LoansScreen() {
               bounces={true}
               scrollEventThrottle={16}
             >
-              {(() => {
-                console.log(
-                  `🔍 Rendering - loadingCycles: ${loadingCycles}, cycles.length: ${cycles.length}`,
-                );
-                return null;
-              })()}
               {loadingCycles ? (
                 <View style={styles.cyclesLoadingContainer}>
                   <ActivityIndicator

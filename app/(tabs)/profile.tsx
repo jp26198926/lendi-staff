@@ -112,7 +112,6 @@ export default function ProfileScreen() {
   // Check if user is authenticated, redirect to login if not
   useEffect(() => {
     if (!user) {
-      console.log("User not authenticated, redirecting to login");
       router.replace("/login");
       return;
     }

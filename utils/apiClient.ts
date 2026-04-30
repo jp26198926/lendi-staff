@@ -47,20 +47,11 @@ export async function apiRequest<T>(
   // Retrieve auth token from secure storage
   const token = await SecureStorage.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
 
-  // Debug: Log token status
-  if (token) {
-    console.log(`🔐 Token found for ${endpoint} (length: ${token.length})`);
-  } else {
-    console.log(`⚠️ No token found for ${endpoint}`);
-  }
-
   // Get custom server URL if configured
   const customServerUrl = await SecureStorage.getItemAsync(
     STORAGE_KEYS.SERVER_API_URL,
   );
   const baseUrl = customServerUrl || API_CONFIG.BASE_URL;
-
-  console.log(`📡 API Request: ${baseUrl}${endpoint}`);
 
   const requestHeaders = {
     "Content-Type": "application/json",
@@ -69,19 +60,11 @@ export async function apiRequest<T>(
     ...options?.headers,
   };
 
-  // Log request headers (mask token for security)
-  console.log("📤 Request Headers:", {
-    ...requestHeaders,
-    Authorization: token ? `Bearer ${token.substring(0, 20)}...` : "none",
-  });
-
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers: requestHeaders,
     credentials: "include", // Include cookies for web
   });
-
-  console.log(`📥 Response Status: ${response.status} ${response.statusText}`);
 
   // Handle 401 Unauthorized (token expired)
   if (response.status === 401) {
@@ -106,6 +89,5 @@ export async function apiRequest<T>(
     );
   }
 
-  console.log(`✅ API Success: ${endpoint}`);
   return response.json();
 }

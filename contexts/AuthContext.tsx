@@ -80,7 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up handler for token expiration (401 errors)
     setUnauthorizedHandler(() => {
-      console.log("🚨 Session expired - clearing auth state");
       setUser(null);
       setPermissions({});
       setLoading(false);
@@ -149,9 +148,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ email, password }),
     });
 
-    // Debug: Log response structure
-    console.log("Login response:", JSON.stringify(response, null, 2));
-
     // Validate response
     if (!response.token || typeof response.token !== "string") {
       console.error("Invalid token:", response.token);
@@ -194,7 +190,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Store token securely
     await SecureStorage.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, response.token);
-    console.log("✅ Token saved successfully");
 
     // Store remember me preference
     if (rememberMe) {
