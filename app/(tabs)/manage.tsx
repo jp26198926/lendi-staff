@@ -89,7 +89,16 @@ export default function ManageScreen() {
           icon="card"
           label="Payments"
           description="Manage payment records"
-          onPress={() => Alert.alert("Payments", "Coming soon")}
+          onPress={() => {
+            if (hasPermission("/admin/payment", "Access")) {
+              router.push("/payments" as any);
+            } else {
+              Alert.alert(
+                "Access Denied",
+                "You don't have permission to access this page",
+              );
+            }
+          }}
           color={ZentyalColors.warning}
         />
       </View>
