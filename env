@@ -1,0 +1,9 @@
+# LENDI Mobile App Environment Variables
+
+# Backend API URL
+
+# For development on physical device, use your computer's IP address instead of localhost
+
+# Example: EXPO_PUBLIC_API_URL=http://localhost:3000
+
+EXPO_PUBLIC_API_URL=
