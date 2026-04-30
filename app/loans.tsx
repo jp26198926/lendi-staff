@@ -12,18 +12,18 @@ import { Picker } from "@react-native-picker/picker";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // Loan interface
@@ -826,7 +826,7 @@ export default function LoansScreen() {
                         size={18}
                         color={ZentyalColors.info}
                       />
-                      <Text style={styles.viewButtonText}>View Cycles</Text>
+                      <Text style={styles.viewButtonText}>Cycles</Text>
                     </TouchableOpacity>
                   )}
                   {loan.status === "Active" && (
@@ -1184,11 +1184,11 @@ export default function LoansScreen() {
                   </View>
                 )}
 
-                <ScrollView
-                  style={styles.cyclesModalContent}
-                >
+                <ScrollView style={styles.cyclesModalContent}>
                   {(() => {
-                    console.log(`🔍 Rendering - loadingCycles: ${loadingCycles}, cycles.length: ${cycles.length}`);
+                    console.log(
+                      `🔍 Rendering - loadingCycles: ${loadingCycles}, cycles.length: ${cycles.length}`,
+                    );
                     return null;
                   })()}
                   {loadingCycles ? (
