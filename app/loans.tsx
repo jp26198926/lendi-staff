@@ -163,6 +163,19 @@ export default function LoansScreen() {
   const [editCycleDateDue, setEditCycleDateDue] = useState("");
   const [showEditCycleDatePicker, setShowEditCycleDatePicker] = useState(false);
 
+  // Payment state
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentCycle, setPaymentCycle] = useState<Cycle | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date());
+  const [paymentRemarks, setPaymentRemarks] = useState("");
+  const [showPaymentDatePicker, setShowPaymentDatePicker] = useState(false);
+
+  // Cancel cycle state
+  const [cancelCycleModalVisible, setCancelCycleModalVisible] = useState(false);
+  const [cancelingCycle, setCancelingCycle] = useState<Cycle | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+
   const PAGE_PATH = "/admin/loan";
 
   /**
@@ -505,6 +518,171 @@ export default function LoansScreen() {
         error instanceof Error
           ? error.message
           : "Failed to update cycle. Please try again.",
+      );
+    }
+  }
+
+  /**
+   * Open payment modal for a cycle
+   */
+  function handleOpenPaymentModal(cycle: Cycle) {
+    // Check if user has permission to add payments
+    if (!hasPermission("/admin/payment", "Add")) {
+      Alert.alert(
+        "Access Denied",
+        "You don't have permission to record payments",
+      );
+      return;
+    }
+
+    // Only allow payment for active cycles
+    if (cycle.status !== "Active") {
+      Alert.alert(
+        "Cannot Record Payment",
+        "Payments can only be recorded for active cycles",
+      );
+      return;
+    }
+
+    setPaymentCycle(cycle);
+    setPaymentAmount("");
+    setPaymentDate(new Date());
+    setPaymentRemarks("");
+    setPaymentModalVisible(true);
+  }
+
+  /**
+   * Submit payment
+   */
+  async function handleSubmitPayment() {
+    if (!paymentCycle || !viewingLoan) return;
+
+    // Validate amount
+    if (!paymentAmount.trim()) {
+      Alert.alert("Validation Error", "Please enter a payment amount");
+      return;
+    }
+
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert("Validation Error", "Please enter a valid payment amount");
+      return;
+    }
+
+    // Warn if payment exceeds balance
+    if (amount > paymentCycle.balance) {
+      Alert.alert(
+        "Warning",
+        `Payment amount (${formatCurrency(amount)}) exceeds the remaining balance (${formatCurrency(paymentCycle.balance)}). Do you want to continue?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Continue",
+            onPress: () => processPayment(amount),
+          },
+        ],
+      );
+      return;
+    }
+
+    await processPayment(amount);
+  }
+
+  /**
+   * Process payment submission
+   */
+  async function processPayment(amount: number) {
+    if (!paymentCycle || !viewingLoan) return;
+
+    try {
+      const payload = {
+        loanId: viewingLoan._id,
+        cycleId: paymentCycle._id,
+        amount,
+        datePaid: paymentDate.toISOString().split("T")[0],
+        remarks: paymentRemarks.trim() || undefined,
+        status: "Completed",
+      };
+
+      await apiRequest("/api/admin/payment", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      Alert.alert("Success", "Payment recorded successfully");
+      setPaymentModalVisible(false);
+
+      // Refresh cycles list to show updated balance
+      await handleViewCycles(viewingLoan);
+    } catch (error) {
+      console.error("Error recording payment:", error);
+      Alert.alert(
+        "Error Recording Payment",
+        error instanceof Error
+          ? error.message
+          : "Failed to record payment. Please try again.",
+      );
+    }
+  }
+
+  /**
+   * Open cancel cycle modal
+   */
+  function handleCancelCycle(cycle: Cycle) {
+    // Check if user has permission to delete cycles
+    if (!hasPermission("/admin/cycle", "Delete")) {
+      Alert.alert(
+        "Access Denied",
+        "You don't have permission to cancel cycles",
+      );
+      return;
+    }
+
+    // Only allow cancelling active cycles
+    if (cycle.status !== "Active") {
+      Alert.alert("Cannot Cancel", "Only active cycles can be cancelled");
+      return;
+    }
+
+    setCancelingCycle(cycle);
+    setCancelReason("");
+    setCancelCycleModalVisible(true);
+  }
+
+  /**
+   * Process cancel cycle
+   */
+  async function processCancelCycle() {
+    if (!cancelingCycle || !viewingLoan) return;
+
+    // Validate reason
+    if (!cancelReason.trim()) {
+      Alert.alert("Validation Error", "Please provide a cancellation reason");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/admin/cycle/${cancelingCycle._id}`, {
+        method: "DELETE",
+        body: JSON.stringify({
+          reason: cancelReason.trim(),
+        }),
+      });
+
+      Alert.alert("Success", "Cycle cancelled successfully");
+      setCancelCycleModalVisible(false);
+      setCancelingCycle(null);
+      setCancelReason("");
+
+      // Refresh cycles list
+      await handleViewCycles(viewingLoan);
+    } catch (error) {
+      console.error("Error cancelling cycle:", error);
+      Alert.alert(
+        "Error Cancelling Cycle",
+        error instanceof Error
+          ? error.message
+          : "Failed to cancel cycle. Please try again.",
       );
     }
   }
@@ -1133,264 +1311,254 @@ export default function LoansScreen() {
         onRequestClose={() => setCyclesModalVisible(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.cyclesModalOverlay}
         >
-          <TouchableOpacity
-            activeOpacity={1}
-            style={styles.modalOverlayTouchable}
-            onPress={() => setCyclesModalVisible(false)}
-          >
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={(e) => e.stopPropagation()}
-              style={styles.cyclesModalWrapper}
+          <View style={styles.cyclesModalContainer}>
+            <View
+              style={[
+                styles.modalHeader,
+                { paddingHorizontal: 20, paddingTop: 20 },
+              ]}
             >
-              <View style={styles.cyclesModalContainer}>
-                <View style={styles.modalHeader}>
-                  <View>
-                    <Text style={styles.modalTitle}>Loan Cycles</Text>
-                    {viewingLoan && (
-                      <Text style={styles.modalSubtitle}>
-                        {viewingLoan.loanNo} - {viewingLoan.clientId.firstName}{" "}
-                        {viewingLoan.clientId.lastName}
-                      </Text>
-                    )}
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setCyclesModalVisible(false)}
-                  >
-                    <Ionicons
-                      name="close"
-                      size={24}
-                      color={ZentyalColors.dark}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {hasPermission("/admin/cycle", "Add") && (
-                  <View style={styles.addCycleButtonContainer}>
-                    <TouchableOpacity
-                      style={styles.addCycleButton}
-                      onPress={handleOpenAddCycle}
-                    >
-                      <Ionicons
-                        name="add-circle"
-                        size={20}
-                        color={ZentyalColors.primary}
-                      />
-                      <Text style={styles.addCycleButtonText}>Add Cycle</Text>
-                    </TouchableOpacity>
-                  </View>
+              <View>
+                <Text style={styles.modalTitle}>Loan Cycles</Text>
+                {viewingLoan && (
+                  <Text style={styles.modalSubtitle}>
+                    {viewingLoan.loanNo} - {viewingLoan.clientId.firstName}{" "}
+                    {viewingLoan.clientId.lastName}
+                  </Text>
                 )}
+              </View>
+              <TouchableOpacity onPress={() => setCyclesModalVisible(false)}>
+                <Ionicons name="close" size={24} color={ZentyalColors.dark} />
+              </TouchableOpacity>
+            </View>
 
-                <ScrollView style={styles.cyclesModalContent}>
-                  {(() => {
-                    console.log(
-                      `🔍 Rendering - loadingCycles: ${loadingCycles}, cycles.length: ${cycles.length}`,
-                    );
-                    return null;
-                  })()}
-                  {loadingCycles ? (
-                    <View style={styles.cyclesLoadingContainer}>
-                      <ActivityIndicator
-                        size="large"
-                        color={ZentyalColors.primary}
-                      />
-                      <Text style={styles.loadingText}>Loading cycles...</Text>
-                    </View>
-                  ) : cycles.length === 0 ? (
-                    <View style={styles.emptyCyclesContainer}>
-                      <Ionicons
-                        name="calendar-outline"
-                        size={64}
-                        color={ZentyalColors.gray}
-                      />
-                      <Text style={styles.emptyText}>No cycles found</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.cyclesListContainer}>
-                      {cycles.map((cycle, index) => (
-                        <View key={cycle._id} style={styles.cycleCard}>
-                          <View style={styles.cycleHeader}>
-                            <Text style={styles.cycleCount}>
-                              Cycle {cycle.cycleCount}
-                            </Text>
-                            <View
+            {hasPermission("/admin/cycle", "Add") && (
+              <View
+                style={[
+                  styles.addCycleButtonContainer,
+                  { paddingHorizontal: 20 },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.addCycleButton}
+                  onPress={handleOpenAddCycle}
+                >
+                  <Ionicons
+                    name="add-circle"
+                    size={20}
+                    color={ZentyalColors.primary}
+                  />
+                  <Text style={styles.addCycleButtonText}>Add Cycle</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <ScrollView
+              style={styles.cyclesModalContent}
+              contentContainerStyle={styles.cyclesScrollContent}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
+              scrollEventThrottle={16}
+            >
+              {(() => {
+                console.log(
+                  `🔍 Rendering - loadingCycles: ${loadingCycles}, cycles.length: ${cycles.length}`,
+                );
+                return null;
+              })()}
+              {loadingCycles ? (
+                <View style={styles.cyclesLoadingContainer}>
+                  <ActivityIndicator
+                    size="large"
+                    color={ZentyalColors.primary}
+                  />
+                  <Text style={styles.loadingText}>Loading cycles...</Text>
+                </View>
+              ) : cycles.length === 0 ? (
+                <View style={styles.emptyCyclesContainer}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={64}
+                    color={ZentyalColors.gray}
+                  />
+                  <Text style={styles.emptyText}>No cycles found</Text>
+                </View>
+              ) : (
+                <View style={styles.cyclesListContainer}>
+                  {cycles.map((cycle, index) => (
+                    <View key={cycle._id} style={styles.cycleCard}>
+                      <View style={styles.cycleHeader}>
+                        <Text style={styles.cycleCount}>
+                          Cycle {cycle.cycleCount}
+                        </Text>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            {
+                              backgroundColor:
+                                cycle.status === "Active"
+                                  ? ZentyalColors.success + "20"
+                                  : cycle.status === "Completed"
+                                    ? ZentyalColors.info + "20"
+                                    : cycle.status === "Expired"
+                                      ? ZentyalColors.warning + "20"
+                                      : ZentyalColors.gray + "20",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusText,
+                              {
+                                color:
+                                  cycle.status === "Active"
+                                    ? ZentyalColors.success
+                                    : cycle.status === "Completed"
+                                      ? ZentyalColors.info
+                                      : cycle.status === "Expired"
+                                        ? ZentyalColors.warning
+                                        : ZentyalColors.gray,
+                              },
+                            ]}
+                          >
+                            {cycle.status}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.cycleDetails}>
+                        <View style={styles.loanDetailRow}>
+                          <Text style={styles.loanDetailLabel}>Due Date:</Text>
+                          <Text style={styles.loanDetailValue}>
+                            {formatDate(cycle.dateDue)}
+                          </Text>
+                        </View>
+                        <View style={styles.loanDetailRow}>
+                          <Text style={styles.loanDetailLabel}>Principal:</Text>
+                          <Text style={styles.loanDetailValue}>
+                            {formatCurrency(cycle.principal)}
+                          </Text>
+                        </View>
+                        <View style={styles.loanDetailRow}>
+                          <Text style={styles.loanDetailLabel}>Interest:</Text>
+                          <Text style={styles.loanDetailValue}>
+                            {formatCurrency(cycle.interestAmount)} (
+                            {cycle.interestRate}%)
+                          </Text>
+                        </View>
+                        <View style={styles.loanDetailRow}>
+                          <Text style={styles.loanDetailLabel}>Total Due:</Text>
+                          <Text
+                            style={[
+                              styles.loanDetailValue,
+                              styles.highlightValue,
+                            ]}
+                          >
+                            {formatCurrency(cycle.totalDue)}
+                          </Text>
+                        </View>
+                        <View style={styles.loanDetailRow}>
+                          <Text style={styles.loanDetailLabel}>
+                            Total Paid:
+                          </Text>
+                          <Text style={styles.loanDetailValue}>
+                            {formatCurrency(cycle.totalPaid)}
+                          </Text>
+                        </View>
+                        <View style={styles.loanDetailRow}>
+                          <Text style={styles.loanDetailLabel}>Balance:</Text>
+                          <Text
+                            style={[
+                              styles.loanDetailValue,
+                              cycle.balance > 0 && styles.warningValue,
+                            ]}
+                          >
+                            {formatCurrency(cycle.balance)}
+                          </Text>
+                        </View>
+                        <View style={styles.loanDetailRow}>
+                          <Text style={styles.loanDetailLabel}>
+                            Profit Expected:
+                          </Text>
+                          <Text style={styles.loanDetailValue}>
+                            {formatCurrency(cycle.profitExpected)}
+                          </Text>
+                        </View>
+                        <View style={styles.loanDetailRow}>
+                          <Text style={styles.loanDetailLabel}>
+                            Profit Earned:
+                          </Text>
+                          <Text style={styles.loanDetailValue}>
+                            {formatCurrency(cycle.profitEarned)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {cycle.status === "Active" && (
+                        <View style={styles.cycleActions}>
+                          {hasPermission("/admin/payment", "Add") && (
+                            <TouchableOpacity
                               style={[
-                                styles.statusBadge,
-                                {
-                                  backgroundColor:
-                                    cycle.status === "Active"
-                                      ? ZentyalColors.success + "20"
-                                      : cycle.status === "Completed"
-                                        ? ZentyalColors.info + "20"
-                                        : cycle.status === "Expired"
-                                          ? ZentyalColors.warning + "20"
-                                          : ZentyalColors.gray + "20",
-                                },
+                                styles.cycleActionButton,
+                                styles.paymentButton,
                               ]}
+                              onPress={() => handleOpenPaymentModal(cycle)}
                             >
-                              <Text
-                                style={[
-                                  styles.statusText,
-                                  {
-                                    color:
-                                      cycle.status === "Active"
-                                        ? ZentyalColors.success
-                                        : cycle.status === "Completed"
-                                          ? ZentyalColors.info
-                                          : cycle.status === "Expired"
-                                            ? ZentyalColors.warning
-                                            : ZentyalColors.gray,
-                                  },
-                                ]}
-                              >
-                                {cycle.status}
+                              <Ionicons
+                                name="cash-outline"
+                                size={16}
+                                color={ZentyalColors.success}
+                              />
+                              <Text style={styles.paymentButtonText}>
+                                Payment
                               </Text>
-                            </View>
-                          </View>
-
-                          <View style={styles.cycleDetails}>
-                            <View style={styles.loanDetailRow}>
-                              <Text style={styles.loanDetailLabel}>
-                                Due Date:
+                            </TouchableOpacity>
+                          )}
+                          {hasPermission("/admin/cycle", "Edit") && (
+                            <TouchableOpacity
+                              style={[
+                                styles.cycleActionButton,
+                                styles.editButton,
+                              ]}
+                              onPress={() => handleEditCycle(cycle)}
+                            >
+                              <Ionicons
+                                name="create-outline"
+                                size={16}
+                                color={ZentyalColors.primary}
+                              />
+                              <Text style={styles.editButtonText}>Edit</Text>
+                            </TouchableOpacity>
+                          )}
+                          {hasPermission("/admin/cycle", "Delete") && (
+                            <TouchableOpacity
+                              style={[
+                                styles.cycleActionButton,
+                                styles.deleteButton,
+                              ]}
+                              onPress={() => handleCancelCycle(cycle)}
+                            >
+                              <Ionicons
+                                name="close-circle-outline"
+                                size={16}
+                                color={ZentyalColors.danger}
+                              />
+                              <Text style={styles.deleteButtonText}>
+                                Cancel
                               </Text>
-                              <Text style={styles.loanDetailValue}>
-                                {formatDate(cycle.dateDue)}
-                              </Text>
-                            </View>
-                            <View style={styles.loanDetailRow}>
-                              <Text style={styles.loanDetailLabel}>
-                                Principal:
-                              </Text>
-                              <Text style={styles.loanDetailValue}>
-                                {formatCurrency(cycle.principal)}
-                              </Text>
-                            </View>
-                            <View style={styles.loanDetailRow}>
-                              <Text style={styles.loanDetailLabel}>
-                                Interest:
-                              </Text>
-                              <Text style={styles.loanDetailValue}>
-                                {formatCurrency(cycle.interestAmount)} (
-                                {cycle.interestRate}%)
-                              </Text>
-                            </View>
-                            <View style={styles.loanDetailRow}>
-                              <Text style={styles.loanDetailLabel}>
-                                Total Due:
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.loanDetailValue,
-                                  styles.highlightValue,
-                                ]}
-                              >
-                                {formatCurrency(cycle.totalDue)}
-                              </Text>
-                            </View>
-                            <View style={styles.loanDetailRow}>
-                              <Text style={styles.loanDetailLabel}>
-                                Total Paid:
-                              </Text>
-                              <Text style={styles.loanDetailValue}>
-                                {formatCurrency(cycle.totalPaid)}
-                              </Text>
-                            </View>
-                            <View style={styles.loanDetailRow}>
-                              <Text style={styles.loanDetailLabel}>
-                                Balance:
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.loanDetailValue,
-                                  cycle.balance > 0 && styles.warningValue,
-                                ]}
-                              >
-                                {formatCurrency(cycle.balance)}
-                              </Text>
-                            </View>
-                            <View style={styles.loanDetailRow}>
-                              <Text style={styles.loanDetailLabel}>
-                                Profit Expected:
-                              </Text>
-                              <Text style={styles.loanDetailValue}>
-                                {formatCurrency(cycle.profitExpected)}
-                              </Text>
-                            </View>
-                            <View style={styles.loanDetailRow}>
-                              <Text style={styles.loanDetailLabel}>
-                                Profit Earned:
-                              </Text>
-                              <Text style={styles.loanDetailValue}>
-                                {formatCurrency(cycle.profitEarned)}
-                              </Text>
-                            </View>
-                          </View>
-
-                          {cycle.status === "Active" && (
-                            <View style={styles.cycleActions}>
-                              {hasPermission("/admin/cycle", "Edit") && (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.cycleActionButton,
-                                    styles.editButton,
-                                  ]}
-                                  onPress={() => handleEditCycle(cycle)}
-                                >
-                                  <Ionicons
-                                    name="create-outline"
-                                    size={16}
-                                    color={ZentyalColors.primary}
-                                  />
-                                  <Text style={styles.editButtonText}>
-                                    Edit
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-                              {hasPermission("/admin/cycle", "Delete") && (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.cycleActionButton,
-                                    styles.deleteButton,
-                                  ]}
-                                  onPress={() =>
-                                    Alert.alert(
-                                      "Cancel Cycle",
-                                      "Cycle cancellation coming soon",
-                                    )
-                                  }
-                                >
-                                  <Ionicons
-                                    name="close-circle-outline"
-                                    size={16}
-                                    color={ZentyalColors.danger}
-                                  />
-                                  <Text style={styles.deleteButtonText}>
-                                    Cancel
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-                            </View>
+                            </TouchableOpacity>
                           )}
                         </View>
-                      ))}
+                      )}
                     </View>
-                  )}
-                </ScrollView>
-
-                <View style={styles.cyclesModalFooter}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalCloseButton]}
-                    onPress={() => setCyclesModalVisible(false)}
-                  >
-                    <Text style={styles.modalCancelButtonText}>Close</Text>
-                  </TouchableOpacity>
+                  ))}
                 </View>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
+              )}
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1730,6 +1898,334 @@ export default function LoansScreen() {
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Payment Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={paymentModalVisible}
+        onRequestClose={() => setPaymentModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.modalOverlayTouchable}
+            onPress={() => setPaymentModalVisible(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+              style={styles.formModalWrapper}
+            >
+              <View style={styles.formModalContainer}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Record Payment</Text>
+                  <TouchableOpacity
+                    onPress={() => setPaymentModalVisible(false)}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={ZentyalColors.dark}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.modalContent}>
+                  {paymentCycle && viewingLoan && (
+                    <>
+                      <View style={styles.infoBox}>
+                        <View style={styles.infoHeader}>
+                          <Ionicons
+                            name="information-circle"
+                            size={20}
+                            color={ZentyalColors.info}
+                          />
+                          <Text style={styles.infoTitle}>Cycle Details</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Loan Number:</Text>
+                          <Text style={styles.infoValue}>
+                            {(viewingLoan.clientId as any).firstName}{" "}
+                            {(viewingLoan.clientId as any).lastName} - Cycle{" "}
+                            {paymentCycle.cycleCount}
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Total Due:</Text>
+                          <Text style={styles.infoValue}>
+                            {formatCurrency(paymentCycle.totalDue)}
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Total Paid:</Text>
+                          <Text style={styles.infoValue}>
+                            {formatCurrency(paymentCycle.totalPaid)}
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Balance:</Text>
+                          <Text
+                            style={[
+                              styles.infoValue,
+                              {
+                                color:
+                                  paymentCycle.balance > 0
+                                    ? ZentyalColors.danger
+                                    : ZentyalColors.success,
+                                fontWeight: "bold",
+                              },
+                            ]}
+                          >
+                            {formatCurrency(paymentCycle.balance)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.formGroup}>
+                        <Text style={styles.formLabel}>
+                          Payment Amount{" "}
+                          <Text style={{ color: ZentyalColors.danger }}>*</Text>
+                        </Text>
+                        <TextInput
+                          style={styles.formInput}
+                          placeholder="Enter payment amount"
+                          placeholderTextColor={ZentyalColors.gray}
+                          keyboardType="numeric"
+                          value={paymentAmount}
+                          onChangeText={setPaymentAmount}
+                        />
+                      </View>
+
+                      <View style={styles.formGroup}>
+                        <Text style={styles.formLabel}>
+                          Payment Date{" "}
+                          <Text style={{ color: ZentyalColors.danger }}>*</Text>
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.datePickerButton}
+                          onPress={() => setShowPaymentDatePicker(true)}
+                        >
+                          <Text style={styles.datePickerText}>
+                            {formatDate(paymentDate.toISOString())}
+                          </Text>
+                          <Ionicons
+                            name="calendar"
+                            size={20}
+                            color={ZentyalColors.primary}
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {showPaymentDatePicker && (
+                        <DateTimePicker
+                          value={paymentDate}
+                          mode="date"
+                          display={
+                            Platform.OS === "ios" ? "spinner" : "default"
+                          }
+                          onChange={(event, selectedDate) => {
+                            setShowPaymentDatePicker(false);
+                            if (selectedDate) {
+                              setPaymentDate(selectedDate);
+                            }
+                          }}
+                        />
+                      )}
+
+                      <View style={styles.formGroup}>
+                        <Text style={styles.formLabel}>Remarks (Optional)</Text>
+                        <TextInput
+                          style={[styles.formInput, styles.textArea]}
+                          placeholder="Enter any additional notes"
+                          placeholderTextColor={ZentyalColors.gray}
+                          multiline
+                          numberOfLines={4}
+                          value={paymentRemarks}
+                          onChangeText={setPaymentRemarks}
+                        />
+                      </View>
+                    </>
+                  )}
+                </ScrollView>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalCancelButton]}
+                    onPress={() => setPaymentModalVisible(false)}
+                  >
+                    <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalSaveButton]}
+                    onPress={handleSubmitPayment}
+                  >
+                    <Text style={styles.modalSaveButtonText}>
+                      Record Payment
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Cancel Cycle Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={cancelCycleModalVisible}
+        onRequestClose={() => setCancelCycleModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.modalOverlayTouchable}
+            onPress={() => setCancelCycleModalVisible(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+              style={styles.formModalWrapper}
+            >
+              <View style={styles.formModalContainer}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Cancel Cycle</Text>
+                  <TouchableOpacity
+                    onPress={() => setCancelCycleModalVisible(false)}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={ZentyalColors.dark}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.modalContent}>
+                  {cancelingCycle && viewingLoan && (
+                    <>
+                      <View
+                        style={[
+                          styles.infoBox,
+                          { backgroundColor: ZentyalColors.warning + "10" },
+                        ]}
+                      >
+                        <View style={styles.infoHeader}>
+                          <Ionicons
+                            name="warning"
+                            size={20}
+                            color={ZentyalColors.warning}
+                          />
+                          <Text
+                            style={[
+                              styles.infoTitle,
+                              { color: ZentyalColors.warning },
+                            ]}
+                          >
+                            Warning
+                          </Text>
+                        </View>
+                        <Text style={styles.infoText}>
+                          You are about to cancel Cycle{" "}
+                          {cancelingCycle.cycleCount} for loan{" "}
+                          {viewingLoan.loanNo}. This action cannot be undone.
+                        </Text>
+                      </View>
+
+                      <View style={styles.infoBox}>
+                        <View style={styles.infoHeader}>
+                          <Ionicons
+                            name="information-circle"
+                            size={20}
+                            color={ZentyalColors.info}
+                          />
+                          <Text style={styles.infoTitle}>Cycle Details</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Cycle Count:</Text>
+                          <Text style={styles.infoValue}>
+                            {cancelingCycle.cycleCount}
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Total Due:</Text>
+                          <Text style={styles.infoValue}>
+                            {formatCurrency(cancelingCycle.totalDue)}
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Total Paid:</Text>
+                          <Text style={styles.infoValue}>
+                            {formatCurrency(cancelingCycle.totalPaid)}
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Balance:</Text>
+                          <Text
+                            style={[
+                              styles.infoValue,
+                              {
+                                color:
+                                  cancelingCycle.balance > 0
+                                    ? ZentyalColors.danger
+                                    : ZentyalColors.success,
+                                fontWeight: "bold",
+                              },
+                            ]}
+                          >
+                            {formatCurrency(cancelingCycle.balance)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.formGroup}>
+                        <Text style={styles.formLabel}>
+                          Cancellation Reason{" "}
+                          <Text style={{ color: ZentyalColors.danger }}>*</Text>
+                        </Text>
+                        <TextInput
+                          style={[styles.formInput, styles.textArea]}
+                          placeholder="Enter reason for cancelling this cycle"
+                          placeholderTextColor={ZentyalColors.gray}
+                          multiline
+                          numberOfLines={4}
+                          value={cancelReason}
+                          onChangeText={setCancelReason}
+                        />
+                      </View>
+                    </>
+                  )}
+                </ScrollView>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalCancelButton]}
+                    onPress={() => setCancelCycleModalVisible(false)}
+                  >
+                    <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalDeleteButton]}
+                    onPress={processCancelCycle}
+                  >
+                    <Text style={styles.modalDeleteButtonText}>
+                      Cancel Cycle
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -1946,6 +2442,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: ZentyalColors.info,
   },
+  paymentButton: {
+    backgroundColor: ZentyalColors.success + "15",
+  },
+  paymentButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: ZentyalColors.success,
+  },
   // Modal Styles
   modalOverlay: {
     flex: 1,
@@ -2028,6 +2532,32 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
+  },
+  infoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  infoTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: ZentyalColors.dark,
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  infoLabel: {
+    fontSize: 13,
+    color: ZentyalColors.gray,
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: ZentyalColors.dark,
   },
   infoText: {
     flex: 1,
@@ -2161,15 +2691,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   // Cycles Modal Styles
-  cyclesModalWrapper: {
-    width: "100%",
-    maxWidth: 700,
+  cyclesModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   cyclesModalContainer: {
     backgroundColor: "#fff",
     borderRadius: 20,
+    marginHorizontal: 20,
     maxHeight: "90%",
-    width: "100%",
+    width: "90%",
+    maxWidth: 700,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -2182,10 +2716,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cyclesModalContent: {
-    padding: 20,
     maxHeight: 500,
   },
   cyclesModalContentContainer: {
+    padding: 20,
+  },
+  cyclesScrollContent: {
     padding: 20,
   },
   cyclesLoadingContainer: {

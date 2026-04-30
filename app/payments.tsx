@@ -149,7 +149,9 @@ export default function PaymentsScreen() {
   // Fetch Cycles for selected loan
   const fetchCyclesForLoan = async (loanId: string) => {
     try {
-      const response = await apiRequest<Cycle[]>(`/api/admin/cycle?loanId=${loanId}`);
+      const response = await apiRequest<Cycle[]>(
+        `/api/admin/cycle?loanId=${loanId}`,
+      );
       // Only show active cycles for new payments
       const activeCycles = response.filter(
         (cycle: Cycle) => cycle.status === "Active",
