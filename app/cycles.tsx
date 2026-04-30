@@ -29,6 +29,21 @@ import {
 /**
  * Interfaces
  */
+interface Payment {
+  _id: string;
+  paymentNo: string;
+  amount: number;
+  datePaid: string;
+  remarks?: string;
+  status: string;
+  createdAt: string;
+  createdBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
 interface Cycle {
   _id: string;
   loanId: {
@@ -90,10 +105,20 @@ export default function CyclesScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deletingCycle, setDeletingCycle] = useState<Cycle | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
+  const [paymentsModalVisible, setPaymentsModalVisible] = useState(false);
+  const [selectedCycle, setSelectedCycle] = useState<Cycle | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Payment form state
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState<Date>(new Date());
+  const [paymentRemarks, setPaymentRemarks] = useState("");
+  const [showPaymentDatePicker, setShowPaymentDatePicker] = useState(false);
 
   // Add form state
   const [selectedLoanId, setSelectedLoanId] = useState("");
@@ -470,6 +495,131 @@ export default function CyclesScreen() {
   }
 
   /**
+   * Fetch payments for a specific cycle
+   */
+  async function fetchPaymentsForCycle(cycleId: string) {
+    try {
+      setLoadingPayments(true);
+      const response = await apiRequest<Payment[]>(
+        `/api/admin/payment?cycleId=${cycleId}`,
+      );
+      setPayments(response || []);
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to load payments",
+      );
+      setPayments([]);
+    } finally {
+      setLoadingPayments(false);
+    }
+  }
+
+  /**
+   * Open payments modal (history + record)
+   */
+  function handleOpenPayments(cycle: Cycle) {
+    setSelectedCycle(cycle);
+    setPaymentAmount("");
+    setPaymentDate(new Date());
+    setPaymentRemarks("");
+    setPaymentsModalVisible(true);
+    fetchPaymentsForCycle(cycle._id);
+  }
+
+  /**
+   * Handle submit payment
+   */
+  async function handleSubmitPayment() {
+    if (!selectedCycle) return;
+
+    if (!hasPermission(PAGE_PATH, "Edit")) {
+      Alert.alert(
+        "Access Denied",
+        "You don't have permission to record payments",
+      );
+      return;
+    }
+
+    if (selectedCycle.status !== "Active") {
+      Alert.alert(
+        "Cannot Record Payment",
+        "Payments can only be recorded for active cycles",
+      );
+      return;
+    }
+
+    if (!paymentAmount) {
+      Alert.alert("Validation Error", "Please enter payment amount");
+      return;
+    }
+
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert("Validation Error", "Amount must be greater than 0");
+      return;
+    }
+
+    if (amount > selectedCycle.balance) {
+      Alert.alert(
+        "Warning",
+        `Payment amount (${formatCurrency(amount)}) exceeds remaining balance (${formatCurrency(selectedCycle.balance)}). Continue anyway?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Continue", onPress: () => processPayment(amount) },
+        ],
+      );
+    } else {
+      await processPayment(amount);
+    }
+  }
+
+  /**
+   * Process payment submission
+   */
+  async function processPayment(amount: number) {
+    if (!selectedCycle) return;
+
+    try {
+      setLoading(true);
+
+      const paymentData = {
+        loanId: selectedCycle.loanId._id,
+        cycleId: selectedCycle._id,
+        amount,
+        datePaid: paymentDate.toISOString().split("T")[0],
+        remarks: paymentRemarks.trim() || undefined,
+        status: "Completed",
+      };
+
+      await apiRequest("/api/admin/payment", {
+        method: "POST",
+        body: JSON.stringify(paymentData),
+      });
+
+      Alert.alert("Success", "Payment recorded successfully");
+
+      // Clear form and refresh data
+      setPaymentAmount("");
+      setPaymentRemarks("");
+      setPaymentDate(new Date());
+      await fetchCycles();
+      await fetchPaymentsForCycle(selectedCycle._id);
+    } catch (error) {
+      console.error("Error recording payment:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "Failed to record payment. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
    * Process delete cycle
    */
   async function processDelete() {
@@ -592,6 +742,17 @@ export default function CyclesScreen() {
 
         {/* Actions */}
         <View style={styles.actionsContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.historyButton]}
+            onPress={() => handleOpenPayments(item)}
+          >
+            <Ionicons
+              name="list-outline"
+              size={18}
+              color={ZentyalColors.info}
+            />
+            <Text style={styles.historyButtonText}>Payments</Text>
+          </TouchableOpacity>
           {item.status === "Active" && hasPermission(PAGE_PATH, "Edit") && (
             <TouchableOpacity
               style={styles.actionButton}
@@ -602,7 +763,7 @@ export default function CyclesScreen() {
                 size={18}
                 color={ZentyalColors.primary}
               />
-              <Text style={styles.actionButtonText}>Update Due Date</Text>
+              <Text style={styles.actionButtonText}>Update</Text>
             </TouchableOpacity>
           )}
           {item.status === "Active" && hasPermission(PAGE_PATH, "Delete") && (
@@ -615,7 +776,7 @@ export default function CyclesScreen() {
                 size={18}
                 color={ZentyalColors.danger}
               />
-              <Text style={styles.deleteButtonText}>Cancel Cycle</Text>
+              <Text style={styles.deleteButtonText}>Cancel</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1126,6 +1287,238 @@ export default function CyclesScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Payments Modal (History + Record) */}
+      <Modal
+        visible={paymentsModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setPaymentsModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlayCentered}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={styles.modalContentCentered}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Payments</Text>
+              <TouchableOpacity
+                onPress={() => setPaymentsModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={ZentyalColors.dark} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedCycle && (
+              <>
+                <ScrollView style={styles.modalScroll}>
+                  {/* Cycle Info */}
+                  <View style={styles.modalInfo}>
+                    <Text style={styles.modalInfoText}>
+                      Loan: {selectedCycle.loanId.loanNo}
+                    </Text>
+                    <Text style={styles.modalInfoText}>
+                      Cycle #{selectedCycle.cycleCount}
+                    </Text>
+                    <Text style={styles.modalInfoText}>
+                      Total Due: {formatCurrency(selectedCycle.totalDue)}
+                    </Text>
+                    <Text style={styles.modalInfoText}>
+                      Total Paid: {formatCurrency(selectedCycle.totalPaid)}
+                    </Text>
+                    <Text
+                      style={[styles.modalInfoText, styles.balanceHighlight]}
+                    >
+                      Balance: {formatCurrency(selectedCycle.balance)}
+                    </Text>
+                  </View>
+
+                  {/* Payment History Section */}
+                  <View style={styles.sectionDivider}>
+                    <Text style={styles.sectionTitle}>Payment History</Text>
+                  </View>
+
+                  {loadingPayments ? (
+                    <View style={styles.loadingPayments}>
+                      <ActivityIndicator
+                        size="large"
+                        color={ZentyalColors.primary}
+                      />
+                      <Text style={styles.loadingText}>
+                        Loading payments...
+                      </Text>
+                    </View>
+                  ) : payments.length > 0 ? (
+                    <View style={styles.paymentsListContainer}>
+                      {payments.map((payment) => (
+                        <View key={payment._id} style={styles.paymentCard}>
+                          <View style={styles.paymentHeader}>
+                            <View style={styles.paymentHeaderLeft}>
+                              <Text style={styles.paymentNo}>
+                                {payment.paymentNo}
+                              </Text>
+                              <Text style={styles.paymentDate}>
+                                {formatDate(payment.datePaid)}
+                              </Text>
+                            </View>
+                            <View style={styles.paymentHeaderRight}>
+                              <Text style={styles.paymentAmount}>
+                                {formatCurrency(payment.amount)}
+                              </Text>
+                              <View
+                                style={[
+                                  styles.paymentStatusBadge,
+                                  payment.status === "Completed"
+                                    ? styles.completedBadge
+                                    : styles.cancelledBadge,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.paymentStatusText,
+                                    payment.status === "Completed"
+                                      ? styles.completedText
+                                      : styles.cancelledText,
+                                  ]}
+                                >
+                                  {payment.status}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          {payment.remarks && (
+                            <Text style={styles.paymentRemarks}>
+                              {payment.remarks}
+                            </Text>
+                          )}
+                          {payment.createdBy && (
+                            <Text style={styles.paymentCreatedBy}>
+                              Recorded by: {payment.createdBy.firstName}{" "}
+                              {payment.createdBy.lastName}
+                            </Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyPayments}>
+                      <Ionicons
+                        name="receipt-outline"
+                        size={48}
+                        color={ZentyalColors.gray}
+                      />
+                      <Text style={styles.emptyPaymentsText}>
+                        No payments recorded yet
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Record Payment Section */}
+                  {selectedCycle.status === "Active" &&
+                    hasPermission(PAGE_PATH, "Edit") && (
+                      <>
+                        <View style={styles.sectionDivider}>
+                          <Text style={styles.sectionTitle}>
+                            Record New Payment
+                          </Text>
+                        </View>
+
+                        <View style={styles.formGroup}>
+                          <Text style={styles.label}>
+                            Payment Amount{" "}
+                            <Text style={styles.required}>*</Text>
+                          </Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="0.00"
+                            value={paymentAmount}
+                            onChangeText={setPaymentAmount}
+                            keyboardType="decimal-pad"
+                          />
+                        </View>
+
+                        <View style={styles.formGroup}>
+                          <Text style={styles.label}>
+                            Date Paid <Text style={styles.required}>*</Text>
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.datePickerButton}
+                            onPress={() => setShowPaymentDatePicker(true)}
+                          >
+                            <Ionicons
+                              name="calendar-outline"
+                              size={20}
+                              color={ZentyalColors.gray}
+                              style={styles.datePickerIcon}
+                            />
+                            <Text style={styles.datePickerText}>
+                              {formatDate(paymentDate.toISOString())}
+                            </Text>
+                            <Ionicons
+                              name="chevron-down"
+                              size={20}
+                              color={ZentyalColors.gray}
+                              style={styles.datePickerChevron}
+                            />
+                          </TouchableOpacity>
+                          {showPaymentDatePicker && (
+                            <DateTimePicker
+                              value={paymentDate}
+                              mode="date"
+                              display={
+                                Platform.OS === "ios" ? "spinner" : "default"
+                              }
+                              onChange={(event, selectedDate) => {
+                                setShowPaymentDatePicker(Platform.OS === "ios");
+                                if (selectedDate) {
+                                  setPaymentDate(selectedDate);
+                                }
+                              }}
+                            />
+                          )}
+                        </View>
+
+                        <View style={styles.formGroup}>
+                          <Text style={styles.label}>Remarks (Optional)</Text>
+                          <TextInput
+                            style={[styles.input, styles.textArea]}
+                            placeholder="Enter payment notes or remarks..."
+                            value={paymentRemarks}
+                            onChangeText={setPaymentRemarks}
+                            multiline
+                            numberOfLines={3}
+                            textAlignVertical="top"
+                          />
+                        </View>
+                      </>
+                    )}
+                </ScrollView>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => setPaymentsModalVisible(false)}
+                  >
+                    <Text style={styles.cancelButtonText}>Close</Text>
+                  </TouchableOpacity>
+                  {selectedCycle.status === "Active" &&
+                    hasPermission(PAGE_PATH, "Edit") && (
+                      <TouchableOpacity
+                        style={styles.saveButton}
+                        onPress={handleSubmitPayment}
+                      >
+                        <Text style={styles.saveButtonText}>
+                          Record Payment
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                </View>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -1375,6 +1768,124 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: ZentyalColors.danger,
+  },
+  paymentButton: {
+    backgroundColor: ZentyalColors.success + "10",
+  },
+  paymentButtonText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: "600",
+    color: ZentyalColors.success,
+  },
+  balanceHighlight: {
+    fontWeight: "700",
+    color: ZentyalColors.primary,
+    fontSize: 15,
+  },
+  historyButton: {
+    backgroundColor: ZentyalColors.info + "10",
+  },
+  historyButtonText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: "600",
+    color: ZentyalColors.info,
+  },
+  loadingPayments: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  sectionDivider: {
+    marginTop: 20,
+    marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: ZentyalColors.primary,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: ZentyalColors.dark,
+  },
+  paymentsListContainer: {
+    marginBottom: 16,
+  },
+  paymentCard: {
+    backgroundColor: "#fff",
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ZentyalColors.light,
+  },
+  paymentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  paymentHeaderLeft: {
+    flex: 1,
+  },
+  paymentHeaderRight: {
+    alignItems: "flex-end",
+  },
+  paymentNo: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: ZentyalColors.dark,
+    marginBottom: 4,
+  },
+  paymentDate: {
+    fontSize: 13,
+    color: ZentyalColors.gray,
+  },
+  paymentAmount: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: ZentyalColors.success,
+    marginBottom: 4,
+  },
+  paymentStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  completedBadge: {
+    backgroundColor: ZentyalColors.success + "20",
+  },
+  cancelledBadge: {
+    backgroundColor: ZentyalColors.gray + "20",
+  },
+  paymentStatusText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  completedText: {
+    color: ZentyalColors.success,
+  },
+  cancelledText: {
+    color: ZentyalColors.gray,
+  },
+  paymentRemarks: {
+    fontSize: 13,
+    color: ZentyalColors.dark,
+    fontStyle: "italic",
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  paymentCreatedBy: {
+    fontSize: 12,
+    color: ZentyalColors.gray,
+  },
+  emptyPayments: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyPaymentsText: {
+    fontSize: 14,
+    color: ZentyalColors.gray,
+    marginTop: 12,
   },
   editButton: {
     flexDirection: "row",
