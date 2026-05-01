@@ -63,7 +63,10 @@ export default function LoginScreen() {
       if (success) {
         router.replace("/(tabs)");
       } else {
-        Alert.alert("Authentication Failed", "Please try again");
+        Alert.alert(
+          "Authentication Failed",
+          "Your session has expired or biometric authentication failed. Please login with your password.",
+        );
       }
     } catch (error) {
       Alert.alert(

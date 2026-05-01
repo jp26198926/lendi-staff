@@ -66,17 +66,30 @@ export async function apiRequest<T>(
     credentials: "include", // Include cookies for web
   });
 
-  // Handle 401 Unauthorized (token expired)
+  // Handle 401 Unauthorized
   if (response.status === 401) {
-    console.error("❌ 401 Unauthorized - Session expired");
-    await SecureStorage.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
-    await SecureStorage.deleteItemAsync(STORAGE_KEYS.REMEMBER_ME);
+    // Distinguish between login failure and session expiration
+    const isLoginEndpoint = endpoint === "/api/auth/login";
 
-    if (onUnauthorized) {
-      onUnauthorized();
+    if (isLoginEndpoint) {
+      // Login endpoint: Invalid credentials
+      const error = await response.json().catch(() => ({
+        error: "Invalid email or password",
+      }));
+      console.error("❌ 401 Unauthorized - Invalid credentials");
+      throw new Error(error.error || "Invalid email or password");
+    } else {
+      // Other endpoints: Session expired
+      console.error("❌ 401 Unauthorized - Session expired");
+      await SecureStorage.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+      await SecureStorage.deleteItemAsync(STORAGE_KEYS.REMEMBER_ME);
+
+      if (onUnauthorized) {
+        onUnauthorized();
+      }
+
+      throw new Error("Session expired. Please login again.");
     }
-
-    throw new Error("Session expired. Please login again.");
   }
 
   if (!response.ok) {

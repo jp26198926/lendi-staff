@@ -107,7 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       STORAGE_KEYS.REMEMBER_ME,
     );
     if (rememberMe === "true") {
-      await refreshAuth();
+      try {
+        await refreshAuth();
+      } catch (error) {
+        // Session expired or invalid, user needs to login again
+        console.log("Remember me: Session expired, user needs to login");
+      }
     } else {
       setLoading(false);
     }
@@ -221,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Refresh authentication session
+   * @throws Error if session refresh fails
    */
   async function refreshAuth() {
     try {
@@ -286,6 +292,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Session refresh failed:", error);
       await SecureStorage.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
       await SecureStorage.deleteItemAsync(STORAGE_KEYS.REMEMBER_ME);
+      setUser(null);
+      setPermissions({});
+      // Re-throw the error so callers can handle it
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -320,8 +330,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (result.success) {
-      await refreshAuth();
-      return true;
+      // Check if session is still valid by refreshing auth
+      try {
+        await refreshAuth();
+        // Only return true if session refresh succeeded
+        return user !== null;
+      } catch (error) {
+        // Session expired or invalid, biometric failed
+        console.error("Biometric auth failed: Session expired", error);
+        return false;
+      }
     }
 
     return false;
