@@ -50,6 +50,11 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
           <Stack.Screen
+            name="server-settings"
+            options={{ title: "Server Settings", headerShown: false }}
+          />
+
+          <Stack.Screen
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}
           />

@@ -3,6 +3,7 @@
  * Allows users to authenticate with email/password and biometric
  */
 
+import LendiLogo from "@/components/LendiLogo";
 import { ZentyalColors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +14,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,6 +26,7 @@ export default function LoginScreen() {
   const { login, authenticateWithBiometric, biometricEnabled } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -78,87 +81,111 @@ export default function LoginScreen() {
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <View style={styles.content}>
-        <Text style={styles.title}>LENDI</Text>
-        <Text style={styles.subtitle}>Lending Management System</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          <LendiLogo size={120} />
+          <Text style={styles.title}>LENDI</Text>
+          <Text style={styles.subtitle}>Liklik Loan Tasol</Text>
 
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={ZentyalColors.gray}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            editable={!loading}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={ZentyalColors.gray}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!loading}
-          />
-
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => setRememberMe(!rememberMe)}
-            disabled={loading}
-          >
-            <Ionicons
-              name={rememberMe ? "checkbox" : "square-outline"}
-              size={24}
-              color={ZentyalColors.primary}
+          <View style={styles.form}>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={ZentyalColors.gray}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!loading}
             />
-            <Text style={styles.checkboxLabel}>Remember Me</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>Login</Text>
-            )}
-          </TouchableOpacity>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor={ZentyalColors.gray}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                editable={!loading}
+              />
+              <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={() => setShowPassword(!showPassword)}
+                disabled={loading}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={24}
+                  color={ZentyalColors.gray}
+                />
+              </TouchableOpacity>
+            </View>
 
-          {biometricEnabled && (
             <TouchableOpacity
-              style={styles.biometricButton}
-              onPress={handleBiometricLogin}
+              style={styles.checkboxContainer}
+              onPress={() => setRememberMe(!rememberMe)}
               disabled={loading}
             >
               <Ionicons
-                name="finger-print"
-                size={32}
+                name={rememberMe ? "checkbox" : "square-outline"}
+                size={24}
                 color={ZentyalColors.primary}
               />
-              <Text style={styles.biometricText}>Use Biometric</Text>
+              <Text style={styles.checkboxLabel}>Remember Me</Text>
             </TouchableOpacity>
-          )}
 
-          <TouchableOpacity
-            style={styles.serverSettingsButton}
-            onPress={() => router.push("/server-settings")}
-            disabled={loading}
-          >
-            <Ionicons
-              name="settings-outline"
-              size={18}
-              color={ZentyalColors.gray}
-            />
-            <Text style={styles.serverSettingsText}>Server Settings</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.loginButton,
+                loading && styles.loginButtonDisabled,
+              ]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.loginButtonText}>Login</Text>
+              )}
+            </TouchableOpacity>
+
+            {biometricEnabled && (
+              <TouchableOpacity
+                style={styles.biometricButton}
+                onPress={handleBiometricLogin}
+                disabled={loading}
+              >
+                <Ionicons
+                  name="finger-print"
+                  size={32}
+                  color={ZentyalColors.primary}
+                />
+                <Text style={styles.biometricText}>Use Biometric</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.serverSettingsButton}
+              onPress={() => router.push("/server-settings")}
+              disabled={loading}
+            >
+              <Ionicons
+                name="settings-outline"
+                size={18}
+                color={ZentyalColors.gray}
+              />
+              <Text style={styles.serverSettingsText}>Server Settings</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -168,9 +195,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: ZentyalColors.light,
   },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
+    paddingVertical: 20,
+  },
+  content: {
     padding: 20,
   },
   title: {
@@ -188,6 +218,15 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 16,
+  },
+  passwordContainer: {
+    position: "relative",
+  },
+  passwordToggle: {
+    position: "absolute",
+    right: 16,
+    top: 16,
+    padding: 4,
   },
   input: {
     backgroundColor: "#fff",

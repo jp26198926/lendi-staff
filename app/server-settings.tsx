@@ -17,6 +17,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -121,79 +122,90 @@ export default function ServerSettingsScreen() {
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <View style={styles.content}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color={ZentyalColors.primary} />
-          <Text style={styles.backText}>Back to Login</Text>
-        </TouchableOpacity>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={ZentyalColors.primary}
+            />
+            <Text style={styles.backText}>Back to Login</Text>
+          </TouchableOpacity>
 
-        <View style={styles.header}>
-          <Ionicons name="server" size={48} color={ZentyalColors.primary} />
-          <Text style={styles.title}>Server Settings</Text>
-          <Text style={styles.subtitle}>
-            Configure the API server URL for your LENDI application
-          </Text>
-        </View>
-
-        <View style={styles.infoBox}>
-          <Ionicons
-            name="information-circle"
-            size={20}
-            color={ZentyalColors.info}
-          />
-          <View style={styles.infoTextContainer}>
-            <Text style={styles.infoText}>
-              <Text style={styles.infoLabel}>Default URL (from .env): </Text>
-              {API_CONFIG.BASE_URL}
-            </Text>
-            <Text style={styles.infoSubtext}>
-              Custom URL will override the default
+          <View style={styles.header}>
+            <Ionicons name="server" size={48} color={ZentyalColors.primary} />
+            <Text style={styles.title}>Server Settings</Text>
+            <Text style={styles.subtitle}>
+              Configure the API server URL for your LENDI application
             </Text>
           </View>
+
+          <View style={styles.infoBox}>
+            <Ionicons
+              name="information-circle"
+              size={20}
+              color={ZentyalColors.info}
+            />
+            <View style={styles.infoTextContainer}>
+              <Text style={styles.infoText}>
+                <Text style={styles.infoLabel}>Default URL (from .env): </Text>
+                {API_CONFIG.BASE_URL}
+              </Text>
+              <Text style={styles.infoSubtext}>
+                Custom URL will override the default
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.form}>
+            <Text style={styles.label}>Server API URL</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="http://localhost:3000"
+              placeholderTextColor={ZentyalColors.gray}
+              value={apiUrl}
+              onChangeText={setApiUrl}
+              autoCapitalize="none"
+              keyboardType="url"
+              editable={!loading}
+            />
+
+            <Text style={styles.hint}>
+              Examples:{"\n"}• http://localhost:3000 (Web){"\n"}•
+              http://192.168.1.100:3000 (Mobile - Local Network){"\n"}•
+              https://api.yourdomain.com (Production)
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+              onPress={handleSave}
+              disabled={loading}
+            >
+              <Ionicons name="save" size={20} color="#fff" />
+              <Text style={styles.saveButtonText}>Save Configuration</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={handleReset}
+              disabled={loading}
+            >
+              <Ionicons name="refresh" size={20} color={ZentyalColors.danger} />
+              <Text style={styles.resetButtonText}>Reset to Default</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-
-        <View style={styles.form}>
-          <Text style={styles.label}>Server API URL</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="http://localhost:3000"
-            placeholderTextColor={ZentyalColors.gray}
-            value={apiUrl}
-            onChangeText={setApiUrl}
-            autoCapitalize="none"
-            keyboardType="url"
-            editable={!loading}
-          />
-
-          <Text style={styles.hint}>
-            Examples:{"\n"}• http://localhost:3000 (Web){"\n"}•
-            http://192.168.1.100:3000 (Mobile - Local Network){"\n"}•
-            https://api.yourdomain.com (Production)
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={loading}
-          >
-            <Ionicons name="save" size={20} color="#fff" />
-            <Text style={styles.saveButtonText}>Save Configuration</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.resetButton}
-            onPress={handleReset}
-            disabled={loading}
-          >
-            <Ionicons name="refresh" size={20} color={ZentyalColors.danger} />
-            <Text style={styles.resetButtonText}>Reset to Default</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -202,6 +214,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: ZentyalColors.light,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: 20,
   },
   content: {
     flex: 1,
