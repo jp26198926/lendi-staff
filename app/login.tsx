@@ -3,7 +3,6 @@
  * Allows users to authenticate with email/password and biometric
  */
 
-import LendiLogo from "@/components/LendiLogo";
 import { ZentyalColors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +11,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -92,7 +92,11 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          <LendiLogo size={120} />
+          <Image
+            source={require("@/assets/images/icon.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.title}>LENDI</Text>
           <Text style={styles.subtitle}>Liklik Loan Tasol</Text>
 
@@ -205,6 +209,12 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    alignSelf: "center",
+    marginBottom: 16,
   },
   title: {
     fontSize: 48,
